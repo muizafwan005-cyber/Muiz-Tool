@@ -586,7 +586,70 @@ public sealed class FeatureManager
                 IntPtr.Zero;
         }
     }
-
+    
+    // =========================================================
+    // STAGE 5 ROMANTIC FLAME LAUNCHER
+    // =========================================================
+    
+    public void Stage5Romantic(
+        bool enabled)
+    {
+        const string target =
+            "Stage 5 Romantic Flame Launcher [30 Days]";
+    
+        if (!enabled)
+            return;
+    
+        var targetBytes =
+            Encoding.ASCII.GetBytes(
+                target);
+    
+        string pattern =
+            string.Join(
+                " ",
+                targetBytes.Select(
+                    x => x.ToString("X2")));
+    
+        var hits =
+            scanner.ScanProcess(
+                pattern);
+    
+        if (hits.Count == 0)
+        {
+            throw new InvalidOperationException(
+                "Stage 5 Romantic Flame Launcher [30 Days] tidak ditemukan.");
+        }
+    
+        foreach (var nameAddress in hits)
+        {
+            var rageAddress =
+                new IntPtr(
+                    nameAddress.ToInt64() +
+                    0xDE);
+    
+            var bytes =
+                memory.ReadBytes(
+                    rageAddress,
+                    2);
+    
+            if (
+                (bytes[0] == 0x61 &&
+                 bytes[1] == 0x43) ||
+                (bytes[0] == 0xB4 &&
+                 bytes[1] == 0x43))
+            {
+                memory.WriteBytes(
+                    rageAddress,
+                    0xB4,
+                    0x43);
+    
+                return;
+            }
+        }
+    
+        throw new InvalidOperationException(
+            "Stage 5 Romantic: address target tidak ditemukan.");
+    }
 
     // =========================================================
     // AUTO NPC
