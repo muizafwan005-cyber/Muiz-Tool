@@ -588,26 +588,6 @@ public sealed class FeatureManager
     // =========================================================
     // AUTO NPC
     // =========================================================
-    //
-    // Sama seperti CT:
-    //
-    // pattern:
-    // 55 4D 54 20 44 69 73 70 6F 73 61 62 6C 65
-    // 20 50 61 67 65 72
-    //
-    // Cari base yang mempunyai:
-    // base + 0x1A8
-    // base + 0x350
-    //
-    // Kemudian:
-    //
-    // Bels = base + 0x98
-    // Cora = base + 0x240
-    // ACC  = base + 0x3E8
-    //
-    // Setiap pemanggilan FindNpc() melakukan scan ulang,
-    // sehingga Auto NPC benar-benar memperbarui alamat.
-    // =========================================================
 
     public (
         IntPtr Bels,
@@ -629,12 +609,6 @@ public sealed class FeatureManager
                 "AUTO NPC: signature tidak ditemukan.");
         }
 
-
-        // Cari base yang memiliki:
-        //
-        // base + 0x1A8
-        // base + 0x350
-        //
         foreach (var address in hits)
         {
             long baseAddress =
@@ -660,11 +634,6 @@ public sealed class FeatureManager
                 continue;
             }
 
-
-            // =============================================
-            // SIMPAN TIGA ADDRESS DINAMIS
-            // =============================================
-
             npcBels =
                 new IntPtr(
                     baseAddress +
@@ -680,13 +649,11 @@ public sealed class FeatureManager
                     baseAddress +
                     0x3E8);
 
-
             return (
                 npcBels,
                 npcCora,
                 npcAcc);
         }
-
 
         throw new InvalidOperationException(
             "AUTO NPC: base tidak ditemukan.");
@@ -731,12 +698,6 @@ public sealed class FeatureManager
     // =========================================================
     // NPC COMMAND - LEGACY
     // =========================================================
-    //
-    // Method lama tetap dipertahankan agar pemanggil lama
-    // tidak langsung rusak.
-    //
-    // Default target = ACC.
-    //
 
     public (
         IntPtr Bels,
@@ -772,9 +733,6 @@ public sealed class FeatureManager
                 nameof(commandIndex));
         }
 
-
-        // Jika Auto NPC belum pernah
-        // dijalankan, resolve dahulu.
         if (
             npcBels == IntPtr.Zero ||
             npcCora == IntPtr.Zero ||
@@ -782,7 +740,6 @@ public sealed class FeatureManager
         {
             FindNpc();
         }
-
 
         switch (target)
         {
@@ -798,7 +755,6 @@ public sealed class FeatureManager
                     IntPtr.Zero,
                     IntPtr.Zero);
 
-
             case NpcTarget.Cora:
 
                 WriteNpcBytes(
@@ -811,7 +767,6 @@ public sealed class FeatureManager
                     npcCora,
                     IntPtr.Zero);
 
-
             case NpcTarget.Acc:
 
                 WriteNpcBytes(
@@ -823,7 +778,6 @@ public sealed class FeatureManager
                     IntPtr.Zero,
                     IntPtr.Zero,
                     npcAcc);
-
 
             default:
 
@@ -859,7 +813,7 @@ public sealed class FeatureManager
     //
     // 90 27 ?? 04 00 ?? 00 00 00 00 00 00
     //
-    // Offset:
+    // Relative:
     //
     // +05 = Zoom
     // +06 = MAU Keyboard
@@ -951,6 +905,136 @@ public sealed class FeatureManager
 
 
     // =========================================================
+    // TAB 4 - ZOOM INITIALIZE
+    // =========================================================
+
+    public void InitializeZoom()
+    {
+        InitializeZoomAob();
+    }
+
+
+    // =========================================================
+    // TAB 4 - CLEAR ZOOM
+    // =========================================================
+
+    public void ClearZoom()
+    {
+        if (zoomAddress != IntPtr.Zero)
+        {
+            try
+            {
+                Restore(zoomAddress);
+            }
+            catch
+            {
+            }
+        }
+
+        if (mauKeyboardAddress != IntPtr.Zero)
+        {
+            try
+            {
+                Restore(mauKeyboardAddress);
+            }
+            catch
+            {
+            }
+        }
+
+        if (reviveAddress != IntPtr.Zero)
+        {
+            try
+            {
+                Restore(reviveAddress);
+            }
+            catch
+            {
+            }
+        }
+
+        if (autoPickAddress != IntPtr.Zero)
+        {
+            try
+            {
+                Restore(autoPickAddress);
+            }
+            catch
+            {
+            }
+        }
+
+        if (lockSpotAddress != IntPtr.Zero)
+        {
+            try
+            {
+                Restore(lockSpotAddress);
+            }
+            catch
+            {
+            }
+        }
+
+        if (showNameAddress != IntPtr.Zero)
+        {
+            try
+            {
+                Restore(showNameAddress);
+            }
+            catch
+            {
+            }
+        }
+
+        if (fastLootAddress != IntPtr.Zero)
+        {
+            try
+            {
+                Restore(fastLootAddress);
+            }
+            catch
+            {
+            }
+        }
+
+        if (distanceAddress != IntPtr.Zero)
+        {
+            try
+            {
+                Restore(distanceAddress);
+            }
+            catch
+            {
+            }
+        }
+
+        zoomAddress =
+            IntPtr.Zero;
+
+        mauKeyboardAddress =
+            IntPtr.Zero;
+
+        reviveAddress =
+            IntPtr.Zero;
+
+        autoPickAddress =
+            IntPtr.Zero;
+
+        lockSpotAddress =
+            IntPtr.Zero;
+
+        showNameAddress =
+            IntPtr.Zero;
+
+        fastLootAddress =
+            IntPtr.Zero;
+
+        distanceAddress =
+            IntPtr.Zero;
+    }
+
+
+    // =========================================================
     // GET CURRENT ZOOM ADDRESSES
     // =========================================================
 
@@ -983,6 +1067,185 @@ public sealed class FeatureManager
 
 
     // =========================================================
+    // ZOOM
+    // =========================================================
+
+    public void SetZoom(
+        bool enabled)
+    {
+        GetZoomAddresses();
+
+        Capture(
+            zoomAddress,
+            1);
+
+        memory.WriteByte(
+            zoomAddress,
+            enabled
+                ? (byte)0x01
+                : (byte)0x00);
+    }
+
+
+    // =========================================================
+    // AUTO PICK
+    // =========================================================
+
+    public void SetAutoPick(
+        byte mode)
+    {
+        if (mode > 2)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(mode));
+        }
+
+        GetZoomAddresses();
+
+        Capture(
+            autoPickAddress,
+            1);
+
+        memory.WriteByte(
+            autoPickAddress,
+            mode);
+    }
+
+
+    // =========================================================
+    // SHOW NAME
+    // =========================================================
+
+    public void SetShowName(
+        bool enabled)
+    {
+        GetZoomAddresses();
+
+        Capture(
+            showNameAddress,
+            1);
+
+        memory.WriteByte(
+            showNameAddress,
+            enabled
+                ? (byte)0x01
+                : (byte)0x00);
+    }
+
+
+    // =========================================================
+    // FAST LOOT
+    // =========================================================
+
+    public void SetFastLoot(
+        bool enabled)
+    {
+        GetZoomAddresses();
+
+        Capture(
+            fastLootAddress,
+            1);
+
+        memory.WriteByte(
+            fastLootAddress,
+            enabled
+                ? (byte)0x01
+                : (byte)0x00);
+    }
+
+
+    // =========================================================
+    // MAU KEYBOARD MODE
+    // =========================================================
+
+    public void SetMauKeyboardMode(
+        bool enabled)
+    {
+        GetZoomAddresses();
+
+        Capture(
+            mauKeyboardAddress,
+            1);
+
+        memory.WriteByte(
+            mauKeyboardAddress,
+            enabled
+                ? (byte)0x01
+                : (byte)0x00);
+    }
+
+
+    // =========================================================
+    // REVIVE
+    // =========================================================
+    //
+    // 0 = Inactive
+    // 1 = Disable
+    // 2 = Auto
+    // =========================================================
+
+    public void SetRevive(
+        byte mode)
+    {
+        if (mode > 2)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(mode));
+        }
+
+        GetZoomAddresses();
+
+        Capture(
+            reviveAddress,
+            1);
+
+        memory.WriteByte(
+            reviveAddress,
+            mode);
+    }
+
+
+    // =========================================================
+    // LOCK SPOT
+    // =========================================================
+
+    public void SetLockSpot(
+        bool enabled)
+    {
+        GetZoomAddresses();
+
+        Capture(
+            lockSpotAddress,
+            1);
+
+        memory.WriteByte(
+            lockSpotAddress,
+            enabled
+                ? (byte)0x01
+                : (byte)0x00);
+    }
+
+
+    // =========================================================
+    // DISTANCE
+    // =========================================================
+
+    public void SetDistance(
+        float value)
+    {
+        GetZoomAddresses();
+
+        Capture(
+            distanceAddress,
+            4);
+
+        memory.WriteFloat(
+            distanceAddress,
+            value);
+    }
+
+
+    // =========================================================
     // AUTO FOLLOW AOB
     // =========================================================
     //
@@ -993,7 +1256,6 @@ public sealed class FeatureManager
     // Validation:
     //
     // base + 0x1A = 00 08 70 27
-    // base + 0x38 = 00 / 01
     //
     // AutoFollow     = base + 0x38
     // AutoFollowNick = AutoFollow + 0x1F4
@@ -1066,7 +1328,6 @@ public sealed class FeatureManager
             }
             catch
             {
-                // Candidate tidak dapat dibaca.
             }
         }
 
@@ -1087,6 +1348,54 @@ public sealed class FeatureManager
         return (
             autoFollowAddress,
             autoFollowNickAddress);
+    }
+
+
+    // =========================================================
+    // TAB 4 - AUTO FOLLOW INITIALIZE
+    // =========================================================
+
+    public void InitializeAutoFollow()
+    {
+        InitializeAutoFollowAob();
+    }
+
+
+    // =========================================================
+    // TAB 4 - CLEAR AUTO FOLLOW
+    // =========================================================
+
+    public void ClearAutoFollow()
+    {
+        if (autoFollowAddress != IntPtr.Zero)
+        {
+            try
+            {
+                Restore(
+                    autoFollowAddress);
+            }
+            catch
+            {
+            }
+        }
+
+        if (autoFollowNickAddress != IntPtr.Zero)
+        {
+            try
+            {
+                Restore(
+                    autoFollowNickAddress);
+            }
+            catch
+            {
+            }
+        }
+
+        autoFollowAddress =
+            IntPtr.Zero;
+
+        autoFollowNickAddress =
+            IntPtr.Zero;
     }
 
 
