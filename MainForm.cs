@@ -71,7 +71,9 @@ public sealed class MainForm : Form
     private TextBox autoFollowNickTextBox = null!;
     private Button autoFollowNickButton = null!;
     private CheckBox autoFollowEnabledCheck = null!;
-
+    private Panel zoomFeaturePanel = null!;
+    private Panel autoFollowFeaturePanel = null!;
+    
     private System.Windows.Forms.Timer freezeTimer = null!;
 
     private readonly List<FreezeEntry> freezeEntries = new();
@@ -1226,121 +1228,138 @@ public sealed class MainForm : Form
 
         y += 42;
 
+        zoomFeaturePanel = new Panel
+        {
+            Location = new Point(0, y),
+            Size = new Size(300, 360),
+            BackColor = BackColorMain
+        };
+        
+        panel.Controls.Add(zoomFeaturePanel);
+        
+        int zoomY = 0;
+        
         zoomCheck = CreateIndentedCheckBox(
-            panel,
+            zoomFeaturePanel,
             "Zoom",
-            y);
-        y += 34;
+            zoomY);
+        zoomY += 34;
 
         autoPickV1Check = CreateIndentedCheckBox(
-            panel,
+            zoomFeaturePanel,
             "Auto Pick V1",
-            y);
-        y += 34;
-
-        autoPickV2Check = CreateIndentedCheckBox(
-            panel,
-            "Auto Pick V2",
-            y);
-        y += 34;
+            zoomY);
+        zoomY += 34;
 
         showNameCheck = CreateIndentedCheckBox(
-            panel,
+            zoomFeaturePanel,
             "Show Name",
-            y);
-        y += 34;
+            zoomY);
+        zoomY += 34;
+
+        showNameCheck = CreateIndentedCheckBox(
+            zoomFeaturePanel,
+            "Show Name",
+            zoomY);
+        zoomY += 34;
 
         fastLootCheck = CreateIndentedCheckBox(
-            panel,
+            zoomFeaturePanel,
             "Fast Loot",
-            y);
-        y += 34;
+            zoomY);
+        zoomY += 34;
 
         mauKeyboardCheck = CreateIndentedCheckBox(
-            panel,
+            zoomFeaturePanel,
             "MAU Keyboard Mode",
-            y);
-        y += 34;
+            zoomY);
+        zoomY += 34;
 
         var reviveLabel = new Label
         {
             Text = "Revive",
             AutoSize = false,
-            Location = new Point(28, y),
+            Location = new Point(28, zoomY),
             Size = new Size(260, 20),
             ForeColor = ForeColorDim
         };
-        panel.Controls.Add(reviveLabel);
-        y += 24;
+        zoomFeaturePanel.Controls.Add(reviveLabel);
+        zoomY += 24;
 
         reviveInactiveCheck = CreateIndentedCheckBox(
-            panel,
+            zoomFeaturePanel,
             "Inactive",
-            y);
-        y += 30;
-
+            zoomY);
+        zoomY += 30;
+        
         reviveDisableCheck = CreateIndentedCheckBox(
-            panel,
+            zoomFeaturePanel,
             "Disable",
-            y);
-        y += 30;
-
+            zoomY);
+        zoomY += 30;
+        
         reviveAutoCheck = CreateIndentedCheckBox(
-            panel,
+            zoomFeaturePanel,
             "Auto",
-            y);
-        y += 36;
+            zoomY);
+        zoomY += 36;
 
         var distanceLabel = new Label
         {
             Text = "Distance + Lock Spot",
             AutoSize = false,
-            Location = new Point(28, y),
+            Location = new Point(28, zoomY),
             Size = new Size(260, 20),
             ForeColor = ForeColorDim
         };
-        panel.Controls.Add(distanceLabel);
-        y += 24;
+        
+        zoomFeaturePanel.Controls.Add(distanceLabel);
+        zoomY += 24;
 
         var distanceName = new Label
         {
             Text = "Distance",
             AutoSize = false,
-            Location = new Point(28, y + 3),
+            Location = new Point(28, zoomY + 3),
             Size = new Size(75, 24),
             ForeColor = ForeColorMain
         };
-        panel.Controls.Add(distanceName);
-
+        
+        zoomFeaturePanel.Controls.Add(distanceName);
+        
         distanceTextBox = new TextBox
         {
-            Location = new Point(105, y),
+            Location = new Point(105, zoomY),
             Size = new Size(105, 25),
             Text = "4.0",
             BackColor = BackColorInput,
             ForeColor = ForeColorMain,
             BorderStyle = BorderStyle.FixedSingle
         };
-        panel.Controls.Add(distanceTextBox);
+        
+        zoomFeaturePanel.Controls.Add(distanceTextBox);
 
         distanceApplyButton = new Button
         {
             Text = "APPLY",
-            Location = new Point(215, y),
+            Location = new Point(215, zoomY),
             Size = new Size(65, 25),
             FlatStyle = FlatStyle.Flat,
             BackColor = BackColorInput,
             ForeColor = ForeColorMain
         };
+        
         distanceApplyButton.FlatAppearance.BorderSize = 0;
-        panel.Controls.Add(distanceApplyButton);
-        y += 34;
-
+        zoomFeaturePanel.Controls.Add(distanceApplyButton);
+        
+        zoomY += 34;
+        
         lockSpotCheck = CreateIndentedCheckBox(
-            panel,
+            zoomFeaturePanel,
             "Lock Spot = 01",
-            y);
-        y += 44;
+            zoomY);
+        
+        zoomY += 44;
 
         // -----------------------------------------------------
         // AUTO FOLLOW INITIALIZE
@@ -1351,44 +1370,57 @@ public sealed class MainForm : Form
             "AUTO FOLLOW AOB - INITIALIZE",
             y);
         y += 42;
+        
+        autoFollowFeaturePanel = new Panel
+        {
+            Location = new Point(0, y),
+            Size = new Size(300, 100),
+            BackColor = BackColorMain
+        };
+        
+        panel.Controls.Add(autoFollowFeaturePanel);
+        
+        int autoFollowY = 0;
 
         var nickLabel = new Label
         {
             Text = "Nick Follow",
             AutoSize = false,
-            Location = new Point(28, y + 3),
+            Location = new Point(28, autoFollowY + 3),
             Size = new Size(75, 24),
             ForeColor = ForeColorMain
         };
-        panel.Controls.Add(nickLabel);
-
+        autoFollowFeaturePanel.Controls.Add(nickLabel);
+        
         autoFollowNickTextBox = new TextBox
         {
-            Location = new Point(105, y),
+            Location = new Point(105, autoFollowY),
             Size = new Size(105, 25),
             BackColor = BackColorInput,
             ForeColor = ForeColorMain,
             BorderStyle = BorderStyle.FixedSingle
         };
-        panel.Controls.Add(autoFollowNickTextBox);
+        autoFollowFeaturePanel.Controls.Add(autoFollowNickTextBox);
 
         autoFollowNickButton = new Button
         {
             Text = "SET",
-            Location = new Point(215, y),
+            Location = new Point(215, autoFollowY),
             Size = new Size(65, 25),
             FlatStyle = FlatStyle.Flat,
             BackColor = BackColorInput,
             ForeColor = ForeColorMain
         };
+        
         autoFollowNickButton.FlatAppearance.BorderSize = 0;
-        panel.Controls.Add(autoFollowNickButton);
-        y += 34;
-
-        autoFollowEnabledCheck = CreateIndentedCheckBox(
-            panel,
+        autoFollowFeaturePanel.Controls.Add(autoFollowNickButton);
+        
+        autoFollowY += 34;
+        
+          autoFollowEnabledCheck = CreateIndentedCheckBox(
+            autoFollowFeaturePanel,
             "Auto Follow",
-            y);
+            autoFollowY);
 
         autoFollowNickTextBox.Enabled = false;
         autoFollowNickButton.Enabled = false;
@@ -1468,24 +1500,45 @@ public sealed class MainForm : Form
         return check;
     }
 
-
-    private void SetTab4FeatureEnabled(
-        bool enabled)
-    {
-        zoomCheck.Enabled = enabled;
-        autoPickV1Check.Enabled = enabled;
-        autoPickV2Check.Enabled = enabled;
-        showNameCheck.Enabled = enabled;
-        fastLootCheck.Enabled = enabled;
-        mauKeyboardCheck.Enabled = enabled;
-        reviveInactiveCheck.Enabled = enabled;
-        reviveDisableCheck.Enabled = enabled;
-        reviveAutoCheck.Enabled = enabled;
-        lockSpotCheck.Enabled = enabled;
-        distanceTextBox.Enabled = enabled;
-        distanceApplyButton.Enabled = enabled;
-    }
-
+        private void SetTab4FeatureEnabled(
+            bool enabled)
+        {
+            zoomCheck.Enabled = enabled;
+            zoomCheck.Visible = enabled;
+        
+            autoPickV1Check.Enabled = enabled;
+            autoPickV1Check.Visible = enabled;
+        
+            autoPickV2Check.Enabled = enabled;
+            autoPickV2Check.Visible = enabled;
+        
+            showNameCheck.Enabled = enabled;
+            showNameCheck.Visible = enabled;
+        
+            fastLootCheck.Enabled = enabled;
+            fastLootCheck.Visible = enabled;
+        
+            mauKeyboardCheck.Enabled = enabled;
+            mauKeyboardCheck.Visible = enabled;
+        
+            reviveInactiveCheck.Enabled = enabled;
+            reviveInactiveCheck.Visible = enabled;
+        
+            reviveDisableCheck.Enabled = enabled;
+            reviveDisableCheck.Visible = enabled;
+        
+            reviveAutoCheck.Enabled = enabled;
+            reviveAutoCheck.Visible = enabled;
+        
+            lockSpotCheck.Enabled = enabled;
+            lockSpotCheck.Visible = enabled;
+        
+            distanceTextBox.Enabled = enabled;
+            distanceTextBox.Visible = enabled;
+        
+            distanceApplyButton.Enabled = enabled;
+            distanceApplyButton.Visible = enabled;
+        }
 
     private void SetReviveSelection(
         CheckBox selected)
