@@ -1575,7 +1575,8 @@ public sealed class MainForm : Form
 
         try
         {
-            features.SetAutoPick(autoPickV1Check.Checked ? 1 : 0);
+            features.SetAutoPick(
+                (byte)(autoPickV1Check.Checked ? 1 : 0));
         }
         catch (Exception ex)
         {
@@ -1595,7 +1596,8 @@ public sealed class MainForm : Form
 
         try
         {
-            features.SetAutoPick(autoPickV2Check.Checked ? 2 : 0);
+            features.SetAutoPick(
+                (byte)(autoPickV2Check.Checked ? 2 : 0));
         }
         catch (Exception ex)
         {
@@ -1652,7 +1654,8 @@ public sealed class MainForm : Form
         if (reviveInactiveCheck.Checked)
             SetReviveSelection(reviveInactiveCheck);
         if (!zoomInitializeCheck.Checked || features == null) return;
-        try { features.SetRevive(reviveInactiveCheck.Checked ? 0 : 0); }
+        try { features.SetRevive(
+                (byte)(reviveInactiveCheck.Checked ? 0 : 0)); }
         catch (Exception ex) { HandleFeatureError("Revive", ex); }
     }
 
@@ -1662,7 +1665,8 @@ public sealed class MainForm : Form
         if (reviveDisableCheck.Checked)
             SetReviveSelection(reviveDisableCheck);
         if (!zoomInitializeCheck.Checked || features == null) return;
-        try { features.SetRevive(reviveDisableCheck.Checked ? 1 : 0); }
+        try { features.SetRevive(
+                (byte)(reviveDisableCheck.Checked ? 1 : 0)); }
         catch (Exception ex) { HandleFeatureError("Revive", ex); }
     }
 
@@ -1672,7 +1676,8 @@ public sealed class MainForm : Form
         if (reviveAutoCheck.Checked)
             SetReviveSelection(reviveAutoCheck);
         if (!zoomInitializeCheck.Checked || features == null) return;
-        try { features.SetRevive(reviveAutoCheck.Checked ? 2 : 0); }
+        try { features.SetRevive(
+                (byte)(reviveAutoCheck.Checked ? 2 : 0)); }
         catch (Exception ex) { HandleFeatureError("Revive", ex); }
     }
 
