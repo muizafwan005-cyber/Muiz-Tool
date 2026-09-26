@@ -1775,7 +1775,6 @@ public sealed class MainForm : Form
         }
     }
 
-
     private void AutoFollowInitializeCheck_CheckedChanged(
         object? sender,
         EventArgs e)
@@ -1783,41 +1782,66 @@ public sealed class MainForm : Form
         if (features == null)
         {
             ResetCheckBox(autoFollowInitializeCheck, false);
+            SetAutoFollowFeatureEnabled(false);
             return;
         }
-
+    
         try
         {
             if (autoFollowInitializeCheck.Checked)
             {
                 features.InitializeAutoFollow();
-                autoFollowNickTextBox.Text = features.ReadAutoFollowNick();
-                autoFollowNickTextBox.Enabled = true;
-                autoFollowNickButton.Enabled = true;
-                autoFollowEnabledCheck.Enabled = true;
-                statusLabel.Text = "Status: Auto Follow AOB initialized";
+    
+                autoFollowNickTextBox.Text =
+                    features.ReadAutoFollowNick();
+    
+                SetAutoFollowFeatureEnabled(true);
+    
+                statusLabel.Text =
+                    "Status: Auto Follow AOB initialized";
             }
             else
             {
                 features.ClearAutoFollow();
+    
                 autoFollowNickTextBox.Text = "";
-                autoFollowNickTextBox.Enabled = false;
-                autoFollowNickButton.Enabled = false;
-                ResetCheckBox(autoFollowEnabledCheck, false);
-                autoFollowEnabledCheck.Enabled = false;
-                statusLabel.Text = "Status: Auto Follow AOB cleared";
+    
+                ResetCheckBox(
+                    autoFollowEnabledCheck,
+                    false);
+    
+                SetAutoFollowFeatureEnabled(false);
+    
+                statusLabel.Text =
+                    "Status: Auto Follow AOB cleared";
             }
         }
         catch (Exception ex)
         {
-            HandleFeatureError("Auto Follow Initialize", ex);
-            ResetCheckBox(autoFollowInitializeCheck, false);
-            autoFollowNickTextBox.Enabled = false;
-            autoFollowNickButton.Enabled = false;
-            autoFollowEnabledCheck.Enabled = false;
+            HandleFeatureError(
+                "Auto Follow Initialize",
+                ex);
+    
+            ResetCheckBox(
+                autoFollowInitializeCheck,
+                false);
+    
+            SetAutoFollowFeatureEnabled(false);
         }
     }
 
+    private void SetAutoFollowFeatureEnabled(
+        bool enabled)
+    {
+        autoFollowNickTextBox.Enabled = enabled;
+        autoFollowNickTextBox.Visible = enabled;
+    
+        autoFollowNickButton.Enabled = enabled;
+        autoFollowNickButton.Visible = enabled;
+    
+        autoFollowEnabledCheck.Enabled = enabled;
+        autoFollowEnabledCheck.Visible = enabled;
+    }
 
     private void ApplyAutoFollowNick()
     {
