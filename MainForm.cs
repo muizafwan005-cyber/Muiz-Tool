@@ -1237,8 +1237,8 @@ public sealed class MainForm : Form
         stage5RomanticCheck.CheckedChanged +=
             Stage5RomanticCheck_CheckedChanged;
         
-        stage3Check.CheckedChanged +=
-            Stage3Check_CheckedChanged;
+        stage3TrueHeartCheck.CheckedChanged +=
+            Stage3TrueHeartCheck_CheckedChanged;
         
         infernalDragonboneCheck.CheckedChanged +=
             InfernalDragonboneCheck_CheckedChanged;
@@ -4432,7 +4432,7 @@ public sealed class MainForm : Form
     // STAGE 3
     // =========================================================
     
-    private void Stage3Check_CheckedChanged(
+    private void Stage3TrueHeartCheck_CheckedChanged(
         object? sender,
         EventArgs e)
     {
