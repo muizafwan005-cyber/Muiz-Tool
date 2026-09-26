@@ -1,0 +1,3873 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Drawing;
+using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text.Json;
+using System.Windows.Forms;
+using RFTool.Core;
+using RFTool.Features;
+
+namespace RFTool;
+
+public sealed class MainForm : Form
+{
+    private const int FormWidth = 330;
+    private const int FormHeight = 600;
+
+    private const int FreezeIntervalMs = 50;
+
+    private MemoryAccess? memory;
+    private FeatureManager? features;
+    private Process? selectedProcess;
+
+    private ComboBox processCombo = null!;
+    private Button refreshButton = null!;
+    private Button attachButton = null!;
+    private Label statusLabel = null!;
+
+    private TabControl tabs = null!;
+
+    private Panel tab1Scroll = null!;
+    private Panel tab1Content = null!;
+
+    private CheckBox autoNpcCheck = null!;
+    private RadioButton npcBelsRadio = null!;
+    private RadioButton npcCoraRadio = null!;
+    private RadioButton npcAccRadio = null!;
+
+    // =========================================================
+    // NPC ADDRESS LABEL
+    // =========================================================
+
+    private Label npcBelsAddressLabel = null!;
+    private Label npcCoraAddressLabel = null!;
+    private Label npcAccAddressLabel = null!;
+
+    private CheckBox stage2Check = null!;
+    private CheckBox combineCheck = null!;
+
+    private System.Windows.Forms.Timer freezeTimer = null!;
+
+    private readonly List<FreezeEntry> freezeEntries = new();
+
+    // =========================================================
+    // HOTKEY
+    // =========================================================
+
+    private HotkeyTextBox npc7HotkeyBox = null!;
+    private HotkeyTextBox npc0HotkeyBox = null!;
+    private HotkeyTextBox npcMinusHotkeyBox = null!;
+    private HotkeyTextBox npcEqualsHotkeyBox = null!;
+    private HotkeyTextBox npcF12HotkeyBox = null!;
+    private HotkeyTextBox npc8HotkeyBox = null!;
+    private HotkeyTextBox npcF11HotkeyBox = null!;
+
+    private readonly Dictionary<HotkeyAction, HotkeyDefinition> hotkeys = new();
+
+    private const int HotkeyIdNpc7 = 1001;
+    private const int HotkeyIdNpc0 = 1002;
+    private const int HotkeyIdNpcMinus = 1003;
+    private const int HotkeyIdNpcEquals = 1004;
+    private const int HotkeyIdNpcF12 = 1005;
+    private const int HotkeyIdNpc8 = 1006;
+    private const int HotkeyIdNpcF11 = 1007;
+
+    private const uint MOD_ALT = 0x0001;
+    private const uint MOD_CONTROL = 0x0002;
+    private const uint MOD_SHIFT = 0x0004;
+    private const uint MOD_NOREPEAT = 0x4000;
+
+    private const int WM_HOTKEY = 0x0312;
+
+    private readonly string hotkeyFile =
+        Path.Combine(
+            Application.StartupPath,
+            "hotkeys.json");
+
+    private static readonly Color BackColorMain =
+        Color.FromArgb(25, 25, 28);
+
+    private static readonly Color BackColorPanel =
+        Color.FromArgb(32, 32, 36);
+
+    private static readonly Color BackColorInput =
+        Color.FromArgb(42, 42, 47);
+
+    private static readonly Color ForeColorMain =
+        Color.FromArgb(235, 235, 235);
+
+    private static readonly Color ForeColorDim =
+        Color.FromArgb(170, 170, 175);
+
+
+    // =========================================================
+    // CONSTRUCTOR
+    // =========================================================
+    
+    public MainForm()
+    {
+        // =====================================================
+        // BRANDING
+        // =====================================================
+    
+        Text = "Muiz Tool";
+    
+        // Gunakan icon yang sudah tertanam di EXE
+        Icon? appIcon =
+            Icon.ExtractAssociatedIcon(
+                Application.ExecutablePath);
+    
+        if (appIcon != null)
+            Icon = appIcon;
+    
+        ShowIcon = true;
+    
+        StartPosition =
+            FormStartPosition.CenterScreen;
+    
+        ClientSize =
+            new Size(
+                FormWidth,
+                FormHeight);
+    
+        MinimumSize =
+            new Size(
+                FormWidth,
+                FormHeight);
+    
+        MaximumSize =
+            new Size(
+                FormWidth,
+                FormHeight);
+    
+        FormBorderStyle =
+            FormBorderStyle.FixedSingle;
+    
+        MaximizeBox = false;
+    
+        BackColor =
+            BackColorMain;
+    
+        ForeColor =
+            ForeColorMain;
+    
+        Font =
+            new Font(
+                "Segoe UI",
+                9F,
+                FontStyle.Regular);
+    
+        BuildInterface();
+    
+        freezeTimer =
+            new System.Windows.Forms.Timer
+            {
+                Interval =
+                    FreezeIntervalMs
+            };
+    
+        freezeTimer.Tick +=
+            FreezeTimer_Tick;
+    
+        LoadHotkeys();
+    
+        LoadProcesses();
+    
+        FormClosing +=
+            MainForm_FormClosing;
+    }
+
+    // =========================================================
+    // WINDOW HANDLE
+    // =========================================================
+
+    protected override void OnHandleCreated(
+        EventArgs e)
+    {
+        base.OnHandleCreated(e);
+
+        RegisterAllHotkeys();
+    }
+
+
+    protected override void OnHandleDestroyed(
+        EventArgs e)
+    {
+        UnregisterAllHotkeys();
+
+        base.OnHandleDestroyed(e);
+    }
+
+
+    // =========================================================
+    // WINDOWS HOTKEY
+    // =========================================================
+
+    [DllImport(
+        "user32.dll",
+        SetLastError = true)]
+    private static extern bool RegisterHotKey(
+        IntPtr hWnd,
+        int id,
+        uint fsModifiers,
+        uint vk);
+
+
+    [DllImport(
+        "user32.dll",
+        SetLastError = true)]
+    private static extern bool UnregisterHotKey(
+        IntPtr hWnd,
+        int id);
+
+
+    protected override void WndProc(
+        ref Message m)
+    {
+        if (m.Msg == WM_HOTKEY)
+        {
+            int id =
+                m.WParam.ToInt32();
+
+            HandleGlobalHotkey(id);
+        }
+
+        base.WndProc(
+            ref m);
+    }
+
+
+    private void HandleGlobalHotkey(
+        int id)
+    {
+        if (id == HotkeyIdNpc7)
+        {
+            ExecuteNpcHotkey(
+                HotkeyAction.Npc7);
+
+            return;
+        }
+
+        if (id == HotkeyIdNpc0)
+        {
+            ExecuteNpcHotkey(
+                HotkeyAction.Npc0);
+
+            return;
+        }
+
+        if (id == HotkeyIdNpcMinus)
+        {
+            ExecuteNpcHotkey(
+                HotkeyAction.NpcMinus);
+
+            return;
+        }
+
+        if (id == HotkeyIdNpcEquals)
+        {
+            ExecuteNpcHotkey(
+                HotkeyAction.NpcEquals);
+
+            return;
+        }
+
+        if (id == HotkeyIdNpcF12)
+        {
+            ExecuteNpcHotkey(
+                HotkeyAction.NpcF12);
+
+            return;
+        }
+
+        if (id == HotkeyIdNpc8)
+        {
+            ExecuteNpcHotkey(
+                HotkeyAction.Npc8);
+
+            return;
+        }
+
+        if (id == HotkeyIdNpcF11)
+        {
+            ExecuteNpcHotkey(
+                HotkeyAction.NpcF11);
+        }
+    }
+
+
+    private void ExecuteNpcHotkey(
+        HotkeyAction action)
+    {
+        if (!IsAttached() ||
+            features == null)
+        {
+            statusLabel.Text =
+                "Status: Attach process terlebih dahulu.";
+
+            return;
+        }
+
+        try
+        {
+            int commandIndex =
+                action switch
+                {
+                    HotkeyAction.Npc7 => 0,
+                    HotkeyAction.Npc0 => 1,
+                    HotkeyAction.NpcMinus => 2,
+                    HotkeyAction.NpcEquals => 3,
+                    HotkeyAction.NpcF12 => 4,
+                    HotkeyAction.Npc8 => 5,
+                    HotkeyAction.NpcF11 => 6,
+                    _ => -1
+                };
+
+            if (commandIndex < 0)
+                return;
+
+            NpcTarget target =
+                GetSelectedNpcTarget();
+
+            var result =
+                features.ExecuteNpcCommand(
+                    commandIndex,
+                    target);
+
+            string commandName =
+                action switch
+                {
+                    HotkeyAction.Npc7 => "7",
+                    HotkeyAction.Npc0 => "0",
+                    HotkeyAction.NpcMinus => "-",
+                    HotkeyAction.NpcEquals => "=",
+                    HotkeyAction.NpcF12 => "F12",
+                    HotkeyAction.Npc8 => "8",
+                    HotkeyAction.NpcF11 => "F11",
+                    _ => "?"
+                };
+
+            string targetName =
+                target switch
+                {
+                    NpcTarget.Bels => "BELS",
+                    NpcTarget.Cora => "CORA",
+                    NpcTarget.Acc => "ACC",
+                    _ => "ACC"
+                };
+
+            statusLabel.Text =
+                $"Status: NPC {commandName} → {targetName} updated";
+        }
+        catch (Exception ex)
+        {
+            HandleFeatureError(
+                "NPC " + HotkeyDisplayName(action),
+                ex);
+        }
+    }
+
+
+    // =========================================================
+    // HOTKEY ENUM
+    // =========================================================
+
+    private enum HotkeyAction
+    {
+        Npc7,
+        Npc0,
+        NpcMinus,
+        NpcEquals,
+        NpcF12,
+        Npc8,
+        NpcF11
+    }
+
+
+    // =========================================================
+    // HOTKEY DEFINITION
+    // =========================================================
+
+    private sealed class HotkeyDefinition
+    {
+        public int Id { get; }
+
+        public HotkeyAction Action { get; }
+
+        public Keys Key { get; set; }
+
+        public Keys Modifiers { get; set; }
+
+        public HotkeyDefinition(
+            int id,
+            HotkeyAction action,
+            Keys key,
+            Keys modifiers)
+        {
+            Id = id;
+            Action = action;
+            Key = key;
+            Modifiers = modifiers;
+        }
+    }
+
+
+    // =========================================================
+    // HOTKEY TEXT BOX
+    // =========================================================
+
+    private sealed class HotkeyTextBox : TextBox
+    {
+        public HotkeyTextBox()
+        {
+            ReadOnly = true;
+
+            TabStop = true;
+
+            ShortcutsEnabled = false;
+        }
+
+        protected override bool IsInputKey(
+            Keys keyData)
+        {
+            return true;
+        }
+    }
+
+
+    // =========================================================
+    // BUILD INTERFACE
+    // =========================================================
+
+    private void BuildInterface()
+    {
+        SuspendLayout();
+
+        var topPanel = new Panel
+        {
+            Dock =
+                DockStyle.Top,
+
+            Height =
+                78,
+
+            BackColor =
+                BackColorPanel
+        };
+
+        var processLabel = new Label
+        {
+            Text =
+                "PROCESS",
+
+            AutoSize =
+                true,
+
+            Location =
+                new Point(
+                    10,
+                    9),
+
+            ForeColor =
+                ForeColorDim
+        };
+
+        topPanel.Controls.Add(
+            processLabel);
+
+        processCombo = new ComboBox
+        {
+            Location =
+                new Point(
+                    10,
+                    28),
+
+            Size =
+                new Size(
+                    185,
+                    27),
+
+            DropDownStyle =
+                ComboBoxStyle.DropDownList,
+
+            BackColor =
+                BackColorInput,
+
+            ForeColor =
+                ForeColorMain,
+
+            FlatStyle =
+                FlatStyle.Flat
+        };
+
+        topPanel.Controls.Add(
+            processCombo);
+
+        refreshButton = new Button
+        {
+            Text =
+                "REFRESH",
+
+            Location =
+                new Point(
+                    200,
+                    28),
+
+            Size =
+                new Size(
+                    55,
+                    27),
+
+            FlatStyle =
+                FlatStyle.Flat,
+
+            BackColor =
+                BackColorInput,
+
+            ForeColor =
+                ForeColorMain
+        };
+
+        refreshButton.FlatAppearance.BorderSize =
+            0;
+
+        refreshButton.Click +=
+            (_, _) =>
+            {
+                LoadProcesses();
+            };
+
+        topPanel.Controls.Add(
+            refreshButton);
+
+        attachButton = new Button
+        {
+            Text =
+                "ATTACH",
+
+            Location =
+                new Point(
+                    260,
+                    28),
+
+            Size =
+                new Size(
+                    60,
+                    27),
+
+            FlatStyle =
+                FlatStyle.Flat,
+
+            BackColor =
+                BackColorInput,
+
+            ForeColor =
+                ForeColorMain
+        };
+
+        attachButton.FlatAppearance.BorderSize =
+            0;
+
+        attachButton.Click +=
+            (_, _) =>
+            {
+                AttachSelectedProcess();
+            };
+
+        topPanel.Controls.Add(
+            attachButton);
+
+        statusLabel = new Label
+        {
+            Text =
+                "Status: Not attached",
+
+            AutoSize =
+                false,
+
+            Location =
+                new Point(
+                    10,
+                    57),
+
+            Size =
+                new Size(
+                    310,
+                    18),
+
+            ForeColor =
+                ForeColorDim
+        };
+
+        topPanel.Controls.Add(
+            statusLabel);
+
+
+        // =====================================================
+        // TABS
+        // =====================================================
+
+        tabs = new TabControl
+        {
+            Dock =
+                DockStyle.Fill,
+
+            Appearance =
+                TabAppearance.Normal,
+
+            DrawMode =
+                TabDrawMode.Normal
+        };
+
+
+        // =====================================================
+        // TAB 1
+        // =====================================================
+
+        var tab1 = new TabPage
+        {
+            Text =
+                "Edit + Freeze",
+
+            BackColor =
+                BackColorMain,
+
+            ForeColor =
+                ForeColorMain
+        };
+
+        tabs.TabPages.Add(
+            tab1);
+
+        BuildTab1(
+            tab1);
+
+
+        // =====================================================
+        // TAB 2
+        // =====================================================
+
+        var tab2 = new TabPage
+        {
+            Text =
+                "ON / OFF",
+
+            BackColor =
+                BackColorMain,
+
+            ForeColor =
+                ForeColorMain
+        };
+
+        tabs.TabPages.Add(
+            tab2);
+
+        BuildTab2(
+            tab2);
+
+
+        // =====================================================
+        // TAB 3
+        // =====================================================
+
+        var tab3 = new TabPage
+        {
+            Text =
+                "HOTKEY",
+
+            BackColor =
+                BackColorMain,
+
+            ForeColor =
+                ForeColorMain
+        };
+
+        tabs.TabPages.Add(
+            tab3);
+
+        BuildTab3(
+            tab3);
+
+
+        Controls.Add(
+            tabs);
+
+        Controls.Add(
+            topPanel);
+
+        ResumeLayout(
+            false);
+    }
+
+
+    // =========================================================
+    // NPC TARGET CONTROLS
+    // =========================================================
+
+    private void SetNpcTargetControlsEnabled(
+        bool enabled)
+    {
+        if (npcBelsRadio != null)
+        {
+            npcBelsRadio.Enabled =
+                enabled;
+        }
+
+        if (npcCoraRadio != null)
+        {
+            npcCoraRadio.Enabled =
+                enabled;
+        }
+
+        if (npcAccRadio != null)
+        {
+            npcAccRadio.Enabled =
+                enabled;
+        }
+    }
+
+
+    private NpcTarget GetSelectedNpcTarget()
+    {
+        if (
+            npcBelsRadio != null &&
+            npcBelsRadio.Checked)
+        {
+            return NpcTarget.Bels;
+        }
+
+        if (
+            npcCoraRadio != null &&
+            npcCoraRadio.Checked)
+        {
+            return NpcTarget.Cora;
+        }
+
+        return NpcTarget.Acc;
+    }
+
+
+    // =========================================================
+    // NPC ADDRESS DISPLAY
+    // =========================================================
+
+    private void ResetNpcAddressLabels()
+    {
+        if (npcBelsAddressLabel != null)
+        {
+            npcBelsAddressLabel.Text =
+                "Address: -";
+        }
+
+        if (npcCoraAddressLabel != null)
+        {
+            npcCoraAddressLabel.Text =
+                "Address: -";
+        }
+
+        if (npcAccAddressLabel != null)
+        {
+            npcAccAddressLabel.Text =
+                "Address: -";
+        }
+    }
+
+
+    private void UpdateNpcAddressLabels(
+        IntPtr bels,
+        IntPtr cora,
+        IntPtr acc)
+    {
+        if (npcBelsAddressLabel != null)
+        {
+            npcBelsAddressLabel.Text =
+                $"Address: 0x{bels.ToInt64():X8}";
+        }
+
+        if (npcCoraAddressLabel != null)
+        {
+            npcCoraAddressLabel.Text =
+                $"Address: 0x{cora.ToInt64():X8}";
+        }
+
+        if (npcAccAddressLabel != null)
+        {
+            npcAccAddressLabel.Text =
+                $"Address: 0x{acc.ToInt64():X8}";
+        }
+    }
+
+
+    // =========================================================
+    // TAB 1
+    // =========================================================
+
+    private void BuildTab1(
+        TabPage tab)
+    {
+        tab1Scroll = new Panel
+        {
+            Dock =
+                DockStyle.Fill,
+
+            AutoScroll =
+                true,
+
+            BackColor =
+                BackColorMain,
+
+            Padding =
+                new Padding(5)
+        };
+
+        tab.Controls.Add(
+            tab1Scroll);
+
+        tab1Content = new Panel
+        {
+            Location =
+                new Point(
+                    0,
+                    0),
+
+            Width =
+                300,
+
+            Height =
+                700,
+
+            BackColor =
+                BackColorMain
+        };
+
+        tab1Scroll.Controls.Add(
+            tab1Content);
+
+        int y = 5;
+
+
+        AddFreezeRow(
+            tab1Content,
+            "Nick",
+            0x10,
+            FreezeType.String6,
+            ref y);
+
+        AddFreezeRow(
+            tab1Content,
+            "aspd 255",
+            0x96,
+            FreezeType.Byte,
+            ref y);
+
+        AddFreezeRow(
+            tab1Content,
+            "aspd 65",
+            0x97,
+            FreezeType.Byte,
+            ref y);
+
+        AddFreezeRow(
+            tab1Content,
+            "Speed Float",
+            0x708,
+            FreezeType.Float,
+            ref y);
+
+        AddFreezeRow(
+            tab1Content,
+            "Detect Trap",
+            0x802,
+            FreezeType.Byte,
+            ref y);
+
+        AddFreezeRow(
+            tab1Content,
+            "Detect Invis",
+            0x801,
+            FreezeType.Byte,
+            ref y);
+
+        AddFreezeRow(
+            tab1Content,
+            "AntiStun",
+            0x804,
+            FreezeType.Byte,
+            ref y);
+
+        AddFreezeRow(
+            tab1Content,
+            "Anti Stun 2",
+            0x808,
+            FreezeType.Byte,
+            ref y);
+
+        AddFreezeRow(
+            tab1Content,
+            "TAB Bell[01]Cora[23]Acc[4]",
+            0x4524,
+            FreezeType.Byte,
+            ref y);
+
+        AddFreezeRow(
+            tab1Content,
+            "buta",
+            0x816,
+            FreezeType.Byte,
+            ref y);
+
+
+        tab1Content.Height =
+            Math.Max(
+                700,
+                y + 10);
+    }
+
+
+    // =========================================================
+    // TAB 2
+    // =========================================================
+
+    private void BuildTab2(
+        TabPage tab)
+    {
+        var panel = new Panel
+        {
+            Dock =
+                DockStyle.Fill,
+
+            BackColor =
+                BackColorMain,
+
+            Padding =
+                new Padding(12)
+        };
+
+        tab.Controls.Add(
+            panel);
+
+        int y = 15;
+
+        // =====================================================
+        // AUTO NPC
+        // =====================================================
+
+        autoNpcCheck =
+            CreateFeatureCheckBox(
+                panel,
+                "Auto NPC",
+                y);
+
+
+        // -----------------------------------------------------
+        // NPC TARGET
+        // -----------------------------------------------------
+
+        npcBelsRadio =
+            new RadioButton
+            {
+                AutoSize = true,
+                Text = "NPC BELS",
+                Location =
+                    new Point(
+                        30,
+                        y + 32),
+                ForeColor =
+                    Color.White,
+                BackColor =
+                    Color.Transparent,
+                Enabled = false
+            };
+
+        npcBelsAddressLabel =
+            new Label
+            {
+                AutoSize = false,
+                Text = "Address: -",
+                Location =
+                    new Point(
+                        48,
+                        y + 53),
+                Size =
+                    new Size(
+                        245,
+                        18),
+                ForeColor =
+                    ForeColorDim,
+                BackColor =
+                    Color.Transparent,
+                Font =
+                    new Font(
+                        "Segoe UI",
+                        8F,
+                        FontStyle.Regular)
+            };
+
+
+        npcCoraRadio =
+            new RadioButton
+            {
+                AutoSize = true,
+                Text = "NPC CORA",
+                Location =
+                    new Point(
+                        30,
+                        y + 80),
+                ForeColor =
+                    Color.White,
+                BackColor =
+                    Color.Transparent,
+                Enabled = false
+            };
+
+        npcCoraAddressLabel =
+            new Label
+            {
+                AutoSize = false,
+                Text = "Address: -",
+                Location =
+                    new Point(
+                        48,
+                        y + 101),
+                Size =
+                    new Size(
+                        245,
+                        18),
+                ForeColor =
+                    ForeColorDim,
+                BackColor =
+                    Color.Transparent,
+                Font =
+                    new Font(
+                        "Segoe UI",
+                        8F,
+                        FontStyle.Regular)
+            };
+
+
+        npcAccRadio =
+            new RadioButton
+            {
+                AutoSize = true,
+                Text = "NPC ACC",
+                Location =
+                    new Point(
+                        30,
+                        y + 128),
+                ForeColor =
+                    Color.White,
+                BackColor =
+                    Color.Transparent,
+                Checked = true,
+                Enabled = false
+            };
+
+        npcAccAddressLabel =
+            new Label
+            {
+                AutoSize = false,
+                Text = "Address: -",
+                Location =
+                    new Point(
+                        48,
+                        y + 149),
+                Size =
+                    new Size(
+                        245,
+                        18),
+                ForeColor =
+                    ForeColorDim,
+                BackColor =
+                    Color.Transparent,
+                Font =
+                    new Font(
+                        "Segoe UI",
+                        8F,
+                        FontStyle.Regular)
+            };
+
+
+        panel.Controls.Add(
+            npcBelsRadio);
+
+        panel.Controls.Add(
+            npcBelsAddressLabel);
+
+        panel.Controls.Add(
+            npcCoraRadio);
+
+        panel.Controls.Add(
+            npcCoraAddressLabel);
+
+        panel.Controls.Add(
+            npcAccRadio);
+
+        panel.Controls.Add(
+            npcAccAddressLabel);
+
+
+        // =====================================================
+        // STAGE 2
+        // =====================================================
+
+        y += 190;
+
+        stage2Check =
+            CreateFeatureCheckBox(
+                panel,
+                "Stage 2 True Heart Flame Launcher",
+                y);
+
+
+        // =====================================================
+        // COMBINE
+        // =====================================================
+
+        y += 48;
+
+        combineCheck =
+            CreateFeatureCheckBox(
+                panel,
+                "Combine Jarak Jauh",
+                y);
+
+
+        // =====================================================
+        // EVENTS
+        // =====================================================
+
+        autoNpcCheck.CheckedChanged +=
+            AutoNpcCheck_CheckedChanged;
+
+        stage2Check.CheckedChanged +=
+            Stage2Check_CheckedChanged;
+
+        combineCheck.CheckedChanged +=
+            CombineCheck_CheckedChanged;
+    }
+
+
+    // =========================================================
+    // TAB 3
+    // =========================================================
+
+    private void BuildTab3(
+        TabPage tab)
+    {
+        var panel = new Panel
+        {
+            Dock =
+                DockStyle.Fill,
+
+            BackColor =
+                BackColorMain,
+
+            Padding =
+                new Padding(10),
+
+            AutoScroll =
+                true
+        };
+
+        tab.Controls.Add(
+            panel);
+
+
+        var title = new Label
+        {
+            Text =
+                "SETTING HOTKEY",
+
+            AutoSize =
+                true,
+
+            Location =
+                new Point(
+                    8,
+                    10),
+
+            ForeColor =
+                ForeColorMain,
+
+            Font =
+                new Font(
+                    "Segoe UI",
+                    10F,
+                    FontStyle.Bold)
+        };
+
+        panel.Controls.Add(
+            title);
+
+
+        var info = new Label
+        {
+            Text =
+                "Klik kotak lalu tekan tombol yang diinginkan.",
+
+            AutoSize =
+                false,
+
+            Location =
+                new Point(
+                    8,
+                    36),
+
+            Size =
+                new Size(
+                    295,
+                    36),
+
+            ForeColor =
+                ForeColorDim
+        };
+
+        panel.Controls.Add(
+            info);
+
+
+        int y = 82;
+
+
+        // -----------------------------------------------------
+        // NPC COMMANDS
+        // -----------------------------------------------------
+
+        npc7HotkeyBox =
+            AddHotkeyRow(
+                panel,
+                "NPC 7",
+                HotkeyAction.Npc7,
+                y);
+
+        y += 72;
+
+        npc0HotkeyBox =
+            AddHotkeyRow(
+                panel,
+                "NPC 0",
+                HotkeyAction.Npc0,
+                y);
+
+        y += 72;
+
+        npcMinusHotkeyBox =
+            AddHotkeyRow(
+                panel,
+                "NPC -",
+                HotkeyAction.NpcMinus,
+                y);
+
+        y += 72;
+
+        npcEqualsHotkeyBox =
+            AddHotkeyRow(
+                panel,
+                "NPC =",
+                HotkeyAction.NpcEquals,
+                y);
+
+        y += 72;
+
+        npcF12HotkeyBox =
+            AddHotkeyRow(
+                panel,
+                "NPC F12",
+                HotkeyAction.NpcF12,
+                y);
+
+        y += 72;
+
+        npc8HotkeyBox =
+            AddHotkeyRow(
+                panel,
+                "NPC 8",
+                HotkeyAction.Npc8,
+                y);
+
+        y += 72;
+
+        npcF11HotkeyBox =
+            AddHotkeyRow(
+                panel,
+                "NPC F11",
+                HotkeyAction.NpcF11,
+                y);
+
+        y += 82;
+
+
+        // -----------------------------------------------------
+        // RESET
+        // -----------------------------------------------------
+
+        var resetButton = new Button
+        {
+            Text =
+                "RESET HOTKEY",
+
+            Location =
+                new Point(
+                    8,
+                    y),
+
+            Size =
+                new Size(
+                    130,
+                    30),
+
+            FlatStyle =
+                FlatStyle.Flat,
+
+            BackColor =
+                BackColorInput,
+
+            ForeColor =
+                ForeColorMain
+        };
+
+        resetButton.FlatAppearance.BorderSize =
+            0;
+
+        resetButton.Click +=
+            (_, _) =>
+            {
+                ResetHotkeysToDefault();
+            };
+
+        panel.Controls.Add(
+            resetButton);
+
+
+        // -----------------------------------------------------
+        // SAVE
+        // -----------------------------------------------------
+
+        var saveButton = new Button
+        {
+            Text =
+                "SIMPAN",
+
+            Location =
+                new Point(
+                    145,
+                    y),
+
+            Size =
+                new Size(
+                    130,
+                    30),
+
+            FlatStyle =
+                FlatStyle.Flat,
+
+            BackColor =
+                BackColorInput,
+
+            ForeColor =
+                ForeColorMain
+        };
+
+        saveButton.FlatAppearance.BorderSize =
+            0;
+
+        saveButton.Click +=
+            (_, _) =>
+            {
+                SaveHotkeys();
+
+                statusLabel.Text =
+                    "Status: Setting hotkey tersimpan";
+            };
+
+        panel.Controls.Add(
+            saveButton);
+
+
+        y += 48;
+
+
+        var note = new Label
+        {
+            Text =
+                "Hotkey bekerja secara global selama RF Tool aktif.",
+
+            AutoSize =
+                false,
+
+            Location =
+                new Point(
+                    8,
+                    y),
+
+            Size =
+                new Size(
+                    295,
+                    45),
+
+            ForeColor =
+                ForeColorDim
+        };
+
+        panel.Controls.Add(
+            note);
+    }
+
+
+    // =========================================================
+    // ADD HOTKEY ROW
+    // =========================================================
+
+    private HotkeyTextBox AddHotkeyRow(
+        Control parent,
+        string name,
+        HotkeyAction action,
+        int y)
+    {
+        var label = new Label
+        {
+            Text =
+                name,
+
+            AutoSize =
+                false,
+
+            Location =
+                new Point(
+                    8,
+                    y),
+
+            Size =
+                new Size(
+                    170,
+                    22),
+
+            ForeColor =
+                ForeColorMain
+        };
+
+        parent.Controls.Add(
+            label);
+
+
+        var hotkeyBox = new HotkeyTextBox
+        {
+            Location =
+                new Point(
+                    8,
+                    y + 25),
+
+            Size =
+                new Size(
+                    180,
+                    27),
+
+            BackColor =
+                BackColorInput,
+
+            ForeColor =
+                ForeColorMain,
+
+            BorderStyle =
+                BorderStyle.FixedSingle,
+
+            TextAlign =
+                HorizontalAlignment.Center
+        };
+
+        parent.Controls.Add(
+            hotkeyBox);
+
+
+        hotkeyBox.Enter +=
+            (_, _) =>
+            {
+                BeginHotkeyCapture(
+                    action,
+                    hotkeyBox);
+            };
+
+
+        hotkeyBox.KeyDown +=
+            (_, e) =>
+            {
+                CaptureHotkey(
+                    action,
+                    hotkeyBox,
+                    e);
+            };
+
+
+        hotkeyBox.Leave +=
+            (_, _) =>
+            {
+                EndHotkeyCapture(
+                    action,
+                    hotkeyBox);
+            };
+
+
+        return hotkeyBox;
+    }
+
+
+    // =========================================================
+    // HOTKEY CAPTURE
+    // =========================================================
+
+    private void BeginHotkeyCapture(
+        HotkeyAction action,
+        HotkeyTextBox box)
+    {
+        UnregisterHotkey(
+            action);
+
+        box.Text =
+            "Tekan tombol...";
+
+        box.SelectAll();
+    }
+
+
+    private void EndHotkeyCapture(
+        HotkeyAction action,
+        HotkeyTextBox box)
+    {
+        if (!hotkeys.TryGetValue(
+                action,
+                out var definition))
+        {
+            box.Text =
+                "Belum diset";
+
+            return;
+        }
+
+        box.Text =
+            FormatHotkey(
+                definition.Modifiers,
+                definition.Key);
+    }
+
+
+    private void CaptureHotkey(
+        HotkeyAction action,
+        HotkeyTextBox box,
+        KeyEventArgs e)
+    {
+        e.SuppressKeyPress = true;
+        e.Handled = true;
+
+
+        Keys key =
+            e.KeyCode;
+
+
+        if (key == Keys.Escape)
+        {
+            EndHotkeyCapture(
+                action,
+                box);
+
+            return;
+        }
+
+
+        if (key == Keys.ControlKey ||
+            key == Keys.ShiftKey ||
+            key == Keys.Menu ||
+            key == Keys.LControlKey ||
+            key == Keys.RControlKey ||
+            key == Keys.LShiftKey ||
+            key == Keys.RShiftKey ||
+            key == Keys.LMenu ||
+            key == Keys.RMenu)
+        {
+            box.Text =
+                "Tekan tombol...";
+
+            return;
+        }
+
+
+        Keys modifiers =
+            Keys.None;
+
+        if (e.Control)
+            modifiers |= Keys.Control;
+
+        if (e.Alt)
+            modifiers |= Keys.Alt;
+
+        if (e.Shift)
+            modifiers |= Keys.Shift;
+
+
+        if (IsHotkeyUsedByAnotherFeature(
+                action,
+                modifiers,
+                key))
+        {
+            MessageBox.Show(
+                this,
+                "Hotkey tersebut sudah digunakan fitur lain.",
+                "Hotkey bentrok",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+
+            box.Text =
+                "Tekan tombol...";
+
+            return;
+        }
+
+
+        var definition =
+            GetHotkeyDefinition(
+                action);
+
+
+        Keys oldKey =
+            definition.Key;
+
+        Keys oldModifiers =
+            definition.Modifiers;
+
+
+        definition.Key =
+            key;
+
+        definition.Modifiers =
+            modifiers;
+
+
+        if (!RegisterHotkey(
+                definition))
+        {
+            definition.Key =
+                oldKey;
+
+            definition.Modifiers =
+                oldModifiers;
+
+            if (oldKey != Keys.None)
+            {
+                RegisterHotkey(
+                    definition);
+            }
+
+            MessageBox.Show(
+                this,
+                "Hotkey tidak dapat digunakan.\r\n" +
+                "Kemungkinan sedang dipakai aplikasi lain.",
+                "Hotkey gagal",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+
+            box.Text =
+                FormatHotkey(
+                    oldModifiers,
+                    oldKey);
+
+            return;
+        }
+
+
+        box.Text =
+            FormatHotkey(
+                modifiers,
+                key);
+
+
+        SaveHotkeys();
+
+
+        statusLabel.Text =
+            $"Status: Hotkey {nameFor(action)} → {box.Text}";
+
+
+        BeginInvoke(
+            new Action(
+                () =>
+                {
+                    SelectNextControl(
+                        box,
+                        true,
+                        true,
+                        true,
+                        true);
+                }));
+    }
+
+
+    // =========================================================
+    // HOTKEY REGISTER
+    // =========================================================
+
+    private bool RegisterHotkey(
+        HotkeyDefinition definition)
+    {
+        if (!IsHandleCreated)
+            return false;
+
+        if (definition.Key == Keys.None)
+            return false;
+
+
+        uint modifiers =
+            GetNativeModifiers(
+                definition.Modifiers);
+
+
+        bool result =
+            RegisterHotKey(
+                Handle,
+                definition.Id,
+                modifiers,
+                (uint)definition.Key);
+
+
+        return result;
+    }
+
+
+    private void RegisterAllHotkeys()
+    {
+        if (!IsHandleCreated)
+            return;
+
+        foreach (
+            var definition
+            in hotkeys.Values)
+        {
+            if (definition.Key == Keys.None)
+                continue;
+
+            if (!RegisterHotkey(
+                    definition))
+            {
+                statusLabel.Text =
+                    $"Status: Hotkey {nameFor(definition.Action)} gagal register";
+            }
+        }
+    }
+
+
+    private void UnregisterHotkey(
+        HotkeyAction action)
+    {
+        if (!hotkeys.TryGetValue(
+                action,
+                out var definition))
+        {
+            return;
+        }
+
+        if (!IsHandleCreated)
+            return;
+
+        UnregisterHotKey(
+            Handle,
+            definition.Id);
+    }
+
+
+    private void UnregisterAllHotkeys()
+    {
+        if (!IsHandleCreated)
+            return;
+
+        foreach (
+            var definition
+            in hotkeys.Values)
+        {
+            UnregisterHotKey(
+                Handle,
+                definition.Id);
+        }
+    }
+
+
+    private static uint GetNativeModifiers(
+        Keys modifiers)
+    {
+        uint result = 0;
+
+        if ((modifiers & Keys.Control) != 0)
+            result |= MOD_CONTROL;
+
+        if ((modifiers & Keys.Alt) != 0)
+            result |= MOD_ALT;
+
+        if ((modifiers & Keys.Shift) != 0)
+            result |= MOD_SHIFT;
+
+        result |= MOD_NOREPEAT;
+
+        return result;
+    }
+
+
+    // =========================================================
+    // HOTKEY DEFINITIONS
+    // =========================================================
+
+    private HotkeyDefinition GetHotkeyDefinition(
+        HotkeyAction action)
+    {
+        return hotkeys[action];
+    }
+
+
+    private static string nameFor(
+        HotkeyAction action)
+    {
+        return action switch
+        {
+            HotkeyAction.Npc7 =>
+                "NPC 7",
+
+            HotkeyAction.Npc0 =>
+                "NPC 0",
+
+            HotkeyAction.NpcMinus =>
+                "NPC -",
+
+            HotkeyAction.NpcEquals =>
+                "NPC =",
+
+            HotkeyAction.NpcF12 =>
+                "NPC F12",
+
+            HotkeyAction.Npc8 =>
+                "NPC 8",
+
+            HotkeyAction.NpcF11 =>
+                "NPC F11",
+
+            _ =>
+                "Unknown"
+        };
+    }
+
+
+    // =========================================================
+    // HOTKEY FORMAT
+    // =========================================================
+
+    private static string FormatHotkey(
+        Keys modifiers,
+        Keys key)
+    {
+        if (key == Keys.None)
+            return "Belum diset";
+
+        var parts =
+            new List<string>();
+
+        if ((modifiers & Keys.Control) != 0)
+            parts.Add("Ctrl");
+
+        if ((modifiers & Keys.Alt) != 0)
+            parts.Add("Alt");
+
+        if ((modifiers & Keys.Shift) != 0)
+            parts.Add("Shift");
+
+
+        string keyName =
+            GetKeyDisplayName(
+                key);
+
+        parts.Add(
+            keyName);
+
+        return string.Join(
+            " + ",
+            parts);
+    }
+
+
+    private static string HotkeyDisplayName(
+        HotkeyAction action)
+    {
+        return action switch
+        {
+            HotkeyAction.Npc7 => "7",
+            HotkeyAction.Npc0 => "0",
+            HotkeyAction.NpcMinus => "-",
+            HotkeyAction.NpcEquals => "=",
+            HotkeyAction.NpcF12 => "F12",
+            HotkeyAction.Npc8 => "8",
+            HotkeyAction.NpcF11 => "F11",
+            _ => action.ToString()
+        };
+    }
+
+
+    private static string GetKeyDisplayName(
+        Keys key)
+    {
+        return key switch
+        {
+            Keys.PageUp =>
+                "Page Up",
+
+            Keys.PageDown =>
+                "Page Down",
+
+            Keys.PrintScreen =>
+                "Print Screen",
+
+            Keys.Scroll =>
+                "Scroll Lock",
+
+            Keys.CapsLock =>
+                "Caps Lock",
+
+            Keys.NumLock =>
+                "Num Lock",
+
+            Keys.Insert =>
+                "Insert",
+
+            Keys.Delete =>
+                "Delete",
+
+            Keys.Home =>
+                "Home",
+
+            Keys.End =>
+                "End",
+
+            Keys.Up =>
+                "Up",
+
+            Keys.Down =>
+                "Down",
+
+            Keys.Left =>
+                "Left",
+
+            Keys.Right =>
+                "Right",
+
+            Keys.Space =>
+                "Space",
+
+            Keys.Enter =>
+                "Enter",
+
+            Keys.Back =>
+                "Backspace",
+
+            Keys.Tab =>
+                "Tab",
+
+            Keys.Oemtilde =>
+                "`",
+
+            Keys.D0 =>
+                "0",
+
+            Keys.D1 =>
+                "1",
+
+            Keys.D2 =>
+                "2",
+
+            Keys.D3 =>
+                "3",
+
+            Keys.D4 =>
+                "4",
+
+            Keys.D5 =>
+                "5",
+
+            Keys.D6 =>
+                "6",
+
+            Keys.D7 =>
+                "7",
+
+            Keys.D8 =>
+                "8",
+
+            Keys.D9 =>
+                "9",
+
+            Keys.OemMinus =>
+                "-",
+
+            Keys.Oemplus =>
+                "=",
+
+            _ =>
+                key.ToString()
+        };
+    }
+
+
+    // =========================================================
+    // HOTKEY CONFLICT
+    // =========================================================
+
+    private bool IsHotkeyUsedByAnotherFeature(
+        HotkeyAction currentAction,
+        Keys modifiers,
+        Keys key)
+    {
+        foreach (
+            var definition
+            in hotkeys.Values)
+        {
+            if (definition.Action ==
+                currentAction)
+            {
+                continue;
+            }
+
+            if (definition.Key ==
+                    key &&
+                definition.Modifiers ==
+                    modifiers)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+
+    // =========================================================
+    // LOAD HOTKEY
+    // =========================================================
+
+    private void LoadHotkeys()
+    {
+        hotkeys.Clear();
+
+
+        // -----------------------------------------------------
+        // DEFAULT NPC HOTKEY
+        // -----------------------------------------------------
+
+        hotkeys[HotkeyAction.Npc7] =
+            new HotkeyDefinition(
+                HotkeyIdNpc7,
+                HotkeyAction.Npc7,
+                Keys.D7,
+                Keys.None);
+
+        hotkeys[HotkeyAction.Npc0] =
+            new HotkeyDefinition(
+                HotkeyIdNpc0,
+                HotkeyAction.Npc0,
+                Keys.D0,
+                Keys.None);
+
+        hotkeys[HotkeyAction.NpcMinus] =
+            new HotkeyDefinition(
+                HotkeyIdNpcMinus,
+                HotkeyAction.NpcMinus,
+                Keys.OemMinus,
+                Keys.None);
+
+        hotkeys[HotkeyAction.NpcEquals] =
+            new HotkeyDefinition(
+                HotkeyIdNpcEquals,
+                HotkeyAction.NpcEquals,
+                Keys.Oemplus,
+                Keys.None);
+
+        hotkeys[HotkeyAction.NpcF12] =
+            new HotkeyDefinition(
+                HotkeyIdNpcF12,
+                HotkeyAction.NpcF12,
+                Keys.F12,
+                Keys.None);
+
+        hotkeys[HotkeyAction.Npc8] =
+            new HotkeyDefinition(
+                HotkeyIdNpc8,
+                HotkeyAction.Npc8,
+                Keys.D8,
+                Keys.None);
+
+        hotkeys[HotkeyAction.NpcF11] =
+            new HotkeyDefinition(
+                HotkeyIdNpcF11,
+                HotkeyAction.NpcF11,
+                Keys.F11,
+                Keys.None);
+
+
+        // -----------------------------------------------------
+        // LOAD FILE
+        // -----------------------------------------------------
+
+        try
+        {
+            if (!File.Exists(
+                    hotkeyFile))
+            {
+                UpdateHotkeyBoxes();
+
+                return;
+            }
+
+
+            string json =
+                File.ReadAllText(
+                    hotkeyFile);
+
+
+            var data =
+                JsonSerializer.Deserialize<
+                    HotkeySettings>(
+                    json);
+
+
+            if (data == null)
+            {
+                UpdateHotkeyBoxes();
+
+                return;
+            }
+
+
+            ApplySavedHotkey(
+                HotkeyAction.Npc7,
+                data.Npc7);
+
+            ApplySavedHotkey(
+                HotkeyAction.Npc0,
+                data.Npc0);
+
+            ApplySavedHotkey(
+                HotkeyAction.NpcMinus,
+                data.NpcMinus);
+
+            ApplySavedHotkey(
+                HotkeyAction.NpcEquals,
+                data.NpcEquals);
+
+            ApplySavedHotkey(
+                HotkeyAction.NpcF12,
+                data.NpcF12);
+
+            ApplySavedHotkey(
+                HotkeyAction.Npc8,
+                data.Npc8);
+
+            ApplySavedHotkey(
+                HotkeyAction.NpcF11,
+                data.NpcF11);
+        }
+        catch
+        {
+            // Jika file rusak,
+            // gunakan default.
+        }
+
+
+        UpdateHotkeyBoxes();
+    }
+
+
+    private void ApplySavedHotkey(
+        HotkeyAction action,
+        SavedHotkey? saved)
+    {
+        if (saved == null)
+            return;
+
+
+        if (!Enum.TryParse(
+                saved.Key,
+                true,
+                out Keys key))
+        {
+            return;
+        }
+
+
+        if (!Enum.TryParse(
+                saved.Modifiers,
+                true,
+                out Keys modifiers))
+        {
+            modifiers =
+                Keys.None;
+        }
+
+
+        if (key == Keys.None)
+            return;
+
+
+        var definition =
+            GetHotkeyDefinition(
+                action);
+
+        definition.Key =
+            key;
+
+        definition.Modifiers =
+            modifiers;
+    }
+
+
+    // =========================================================
+    // UPDATE HOTKEY BOX
+    // =========================================================
+
+    private void UpdateHotkeyBoxes()
+    {
+        if (npc7HotkeyBox == null)
+            return;
+
+
+        npc7HotkeyBox.Text =
+            FormatHotkey(
+                hotkeys[HotkeyAction.Npc7].Modifiers,
+                hotkeys[HotkeyAction.Npc7].Key);
+
+        npc0HotkeyBox.Text =
+            FormatHotkey(
+                hotkeys[HotkeyAction.Npc0].Modifiers,
+                hotkeys[HotkeyAction.Npc0].Key);
+
+        npcMinusHotkeyBox.Text =
+            FormatHotkey(
+                hotkeys[HotkeyAction.NpcMinus].Modifiers,
+                hotkeys[HotkeyAction.NpcMinus].Key);
+
+        npcEqualsHotkeyBox.Text =
+            FormatHotkey(
+                hotkeys[HotkeyAction.NpcEquals].Modifiers,
+                hotkeys[HotkeyAction.NpcEquals].Key);
+
+        npcF12HotkeyBox.Text =
+            FormatHotkey(
+                hotkeys[HotkeyAction.NpcF12].Modifiers,
+                hotkeys[HotkeyAction.NpcF12].Key);
+
+        npc8HotkeyBox.Text =
+            FormatHotkey(
+                hotkeys[HotkeyAction.Npc8].Modifiers,
+                hotkeys[HotkeyAction.Npc8].Key);
+
+        npcF11HotkeyBox.Text =
+            FormatHotkey(
+                hotkeys[HotkeyAction.NpcF11].Modifiers,
+                hotkeys[HotkeyAction.NpcF11].Key);
+    }
+
+
+    // =========================================================
+    // SAVE HOTKEY
+    // =========================================================
+
+    private void SaveHotkeys()
+    {
+        try
+        {
+            var data =
+                new HotkeySettings
+                {
+                    Npc7 =
+                        CreateSavedHotkey(
+                            HotkeyAction.Npc7),
+
+                    Npc0 =
+                        CreateSavedHotkey(
+                            HotkeyAction.Npc0),
+
+                    NpcMinus =
+                        CreateSavedHotkey(
+                            HotkeyAction.NpcMinus),
+
+                    NpcEquals =
+                        CreateSavedHotkey(
+                            HotkeyAction.NpcEquals),
+
+                    NpcF12 =
+                        CreateSavedHotkey(
+                            HotkeyAction.NpcF12),
+
+                    Npc8 =
+                        CreateSavedHotkey(
+                            HotkeyAction.Npc8),
+
+                    NpcF11 =
+                        CreateSavedHotkey(
+                            HotkeyAction.NpcF11)
+                };
+
+
+            var options =
+                new JsonSerializerOptions
+                {
+                    WriteIndented = true
+                };
+
+
+            string json =
+                JsonSerializer.Serialize(
+                    data,
+                    options);
+
+
+            File.WriteAllText(
+                hotkeyFile,
+                json);
+        }
+        catch (Exception ex)
+        {
+            statusLabel.Text =
+                "Error: gagal menyimpan hotkey";
+
+            MessageBox.Show(
+                this,
+                $"Gagal menyimpan setting hotkey:\r\n\r\n{ex.Message}",
+                "RF Tool",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
+    }
+
+
+    private SavedHotkey CreateSavedHotkey(
+        HotkeyAction action)
+    {
+        var definition =
+            GetHotkeyDefinition(
+                action);
+
+        return new SavedHotkey
+        {
+            Key =
+                definition.Key.ToString(),
+
+            Modifiers =
+                definition.Modifiers.ToString()
+        };
+    }
+
+
+    // =========================================================
+    // RESET HOTKEY
+    // =========================================================
+
+    private void ResetHotkeysToDefault()
+    {
+        UnregisterAllHotkeys();
+
+
+        hotkeys[HotkeyAction.Npc7] =
+            new HotkeyDefinition(
+                HotkeyIdNpc7,
+                HotkeyAction.Npc7,
+                Keys.D7,
+                Keys.None);
+
+        hotkeys[HotkeyAction.Npc0] =
+            new HotkeyDefinition(
+                HotkeyIdNpc0,
+                HotkeyAction.Npc0,
+                Keys.D0,
+                Keys.None);
+
+        hotkeys[HotkeyAction.NpcMinus] =
+            new HotkeyDefinition(
+                HotkeyIdNpcMinus,
+                HotkeyAction.NpcMinus,
+                Keys.OemMinus,
+                Keys.None);
+
+        hotkeys[HotkeyAction.NpcEquals] =
+            new HotkeyDefinition(
+                HotkeyIdNpcEquals,
+                HotkeyAction.NpcEquals,
+                Keys.Oemplus,
+                Keys.None);
+
+        hotkeys[HotkeyAction.NpcF12] =
+            new HotkeyDefinition(
+                HotkeyIdNpcF12,
+                HotkeyAction.NpcF12,
+                Keys.F12,
+                Keys.None);
+
+        hotkeys[HotkeyAction.Npc8] =
+            new HotkeyDefinition(
+                HotkeyIdNpc8,
+                HotkeyAction.Npc8,
+                Keys.D8,
+                Keys.None);
+
+        hotkeys[HotkeyAction.NpcF11] =
+            new HotkeyDefinition(
+                HotkeyIdNpcF11,
+                HotkeyAction.NpcF11,
+                Keys.F11,
+                Keys.None);
+
+
+        UpdateHotkeyBoxes();
+
+        RegisterAllHotkeys();
+
+        SaveHotkeys();
+
+        statusLabel.Text =
+            "Status: Hotkey kembali ke default";
+    }
+
+
+    // =========================================================
+    // SAVED HOTKEY DATA
+    // =========================================================
+
+    private sealed class HotkeySettings
+    {
+        public SavedHotkey? Npc7 { get; set; }
+
+        public SavedHotkey? Npc0 { get; set; }
+
+        public SavedHotkey? NpcMinus { get; set; }
+
+        public SavedHotkey? NpcEquals { get; set; }
+
+        public SavedHotkey? NpcF12 { get; set; }
+
+        public SavedHotkey? Npc8 { get; set; }
+
+        public SavedHotkey? NpcF11 { get; set; }
+    }
+
+
+    private sealed class SavedHotkey
+    {
+        public string Key { get; set; } = "";
+
+        public string Modifiers { get; set; } = "";
+    }
+
+
+    // =========================================================
+    // CREATE CHECKBOX
+    // =========================================================
+
+    private static CheckBox CreateFeatureCheckBox(
+        Control parent,
+        string text,
+        int y)
+    {
+        var check = new CheckBox
+        {
+            Text =
+                text,
+
+            AutoSize =
+                false,
+
+            Location =
+                new Point(
+                    8,
+                    y),
+
+            Size =
+                new Size(
+                    285,
+                    35),
+
+            ForeColor =
+                ForeColorMain,
+
+            BackColor =
+                BackColorMain,
+
+            FlatStyle =
+                FlatStyle.Standard
+        };
+
+        parent.Controls.Add(
+            check);
+
+        return check;
+    }
+
+
+    // =========================================================
+    // ADD FREEZE ROW
+    // =========================================================
+
+    private void AddFreezeRow(
+        Control parent,
+        string name,
+        long offset,
+        FreezeType type,
+        ref int y)
+    {
+        var label = new Label
+        {
+            Text =
+                name,
+
+            AutoSize =
+                false,
+
+            Location =
+                new Point(
+                    5,
+                    y),
+
+            Size =
+                new Size(
+                    290,
+                    20),
+
+            ForeColor =
+                ForeColorMain
+        };
+
+        parent.Controls.Add(
+            label);
+
+        y += 19;
+
+
+        var addressLabel = new Label
+        {
+            Text =
+                "Address: -",
+
+            AutoSize =
+                false,
+
+            Location =
+                new Point(
+                    5,
+                    y),
+
+            Size =
+                new Size(
+                    290,
+                    18),
+
+            ForeColor =
+                ForeColorDim
+        };
+
+        parent.Controls.Add(
+            addressLabel);
+
+        y += 19;
+
+
+        var textBox = new TextBox
+        {
+            Location =
+                new Point(
+                    5,
+                    y),
+
+            Size =
+                new Size(
+                    145,
+                    25),
+
+            BackColor =
+                BackColorInput,
+
+            ForeColor =
+                ForeColorMain,
+
+            BorderStyle =
+                BorderStyle.FixedSingle
+        };
+
+        parent.Controls.Add(
+            textBox);
+
+
+        var apply = new Button
+        {
+            Text =
+                "APPLY",
+
+            Location =
+                new Point(
+                    155,
+                    y),
+
+            Size =
+                new Size(
+                    58,
+                    25),
+
+            FlatStyle =
+                FlatStyle.Flat,
+
+            BackColor =
+                BackColorInput,
+
+            ForeColor =
+                ForeColorMain
+        };
+
+        apply.FlatAppearance.BorderSize =
+            0;
+
+        parent.Controls.Add(
+            apply);
+
+
+        var freeze = new CheckBox
+        {
+            Text =
+                "FREEZE",
+
+            AutoSize =
+                false,
+
+            Location =
+                new Point(
+                    215,
+                    y),
+
+            Size =
+                new Size(
+                    75,
+                    25),
+
+            ForeColor =
+                ForeColorMain,
+
+            BackColor =
+                BackColorMain
+        };
+
+        parent.Controls.Add(
+            freeze);
+
+
+        var entry =
+            new FreezeEntry(
+                name,
+                offset,
+                type,
+                textBox,
+                freeze,
+                addressLabel);
+
+        freezeEntries.Add(
+            entry);
+
+
+        apply.Click +=
+            (_, _) =>
+            {
+                ApplyEntry(
+                    entry);
+            };
+
+
+        freeze.CheckedChanged +=
+            (_, _) =>
+            {
+                if (freeze.Checked)
+                {
+                    if (
+                        string.IsNullOrWhiteSpace(
+                            textBox.Text))
+                    {
+                        TryReadCurrentValue(
+                            entry);
+                    }
+
+                    if (
+                        string.IsNullOrWhiteSpace(
+                            textBox.Text))
+                    {
+                        ResetCheckBox(
+                            freeze,
+                            false);
+
+                        return;
+                    }
+
+                    if (!IsAttached())
+                    {
+                        MessageBox.Show(
+                            this,
+                            "Attach process terlebih dahulu.",
+                            "RF Tool",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Warning);
+
+                        ResetCheckBox(
+                            freeze,
+                            false);
+
+                        return;
+                    }
+
+                    if (!ApplyEntry(
+                        entry))
+                    {
+                        ResetCheckBox(
+                            freeze,
+                            false);
+
+                        return;
+                    }
+
+                    EnsureFreezeTimer();
+                }
+                else
+                {
+                    StopFreezeTimerIfNeeded();
+                }
+            };
+
+
+        y += 31;
+    }
+
+
+    // =========================================================
+    // UPDATE ALL ADDRESSES
+    // =========================================================
+
+    private void UpdateAllAddresses()
+    {
+        if (!IsAttached() ||
+            memory == null)
+        {
+            foreach (
+                var entry
+                in freezeEntries)
+            {
+                entry.AddressLabel.Text =
+                    "Address: -";
+            }
+
+            return;
+        }
+
+        foreach (
+            var entry
+            in freezeEntries)
+        {
+            try
+            {
+                IntPtr address =
+                    memory.ResolvePointer32(
+                        0xC28B40,
+                        entry.Offset);
+
+                entry.Address =
+                    address;
+
+                entry.AddressLabel.Text =
+                    $"Address: 0x{address.ToInt64():X8}";
+            }
+            catch
+            {
+                entry.Address =
+                    IntPtr.Zero;
+
+                entry.AddressLabel.Text =
+                    "Address: ERROR";
+            }
+        }
+    }
+
+
+    // =========================================================
+    // APPLY ENTRY
+    // =========================================================
+
+    private bool ApplyEntry(
+        FreezeEntry entry)
+    {
+        if (!IsAttached() ||
+            features == null)
+        {
+            MessageBox.Show(
+                this,
+                "Attach process terlebih dahulu.",
+                "RF Tool",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+
+            return false;
+        }
+
+        try
+        {
+            string value =
+                entry.TextBox.Text.Trim();
+
+
+            switch (entry.Type)
+            {
+                case FreezeType.String6:
+
+                    features.WritePlayerString(
+                        entry.Offset,
+                        value,
+                        6);
+
+                    break;
+
+
+                case FreezeType.Byte:
+
+                    if (!TryParseByte(
+                        value,
+                        out byte byteValue))
+                    {
+                        MessageBox.Show(
+                            this,
+                            $"Value untuk {entry.Name} harus 0-255.",
+                            "Value tidak valid",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Warning);
+
+                        return false;
+                    }
+
+
+                    if (
+                        entry.Name ==
+                        "TAB Bell[01]Cora[23]Acc[4]" ||
+
+                        entry.Name ==
+                        "buta")
+                    {
+                        var result =
+                            features.WritePlayerByteVerified(
+                                entry.Offset,
+                                byteValue);
+
+                        entry.Address =
+                            result.Address;
+
+                        entry.AddressLabel.Text =
+                            $"Address: 0x{result.Address.ToInt64():X8}";
+
+                        statusLabel.Text =
+                            $"Status: {entry.Name} → " +
+                            $"0x{result.Address.ToInt64():X8} = " +
+                            $"{result.Value}";
+
+                        if (
+                            result.Value !=
+                            byteValue)
+                        {
+                            MessageBox.Show(
+                                this,
+                                $"{entry.Name} gagal read-back.\r\n\r\n" +
+                                $"Address : 0x{result.Address.ToInt64():X8}\r\n" +
+                                $"Write   : {byteValue}\r\n" +
+                                $"ReadBack: {result.Value}",
+                                "Write tidak sesuai",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Warning);
+
+                            return false;
+                        }
+
+                        return true;
+                    }
+
+
+                    features.WritePlayerByte(
+                        entry.Offset,
+                        byteValue);
+
+                    break;
+
+
+                case FreezeType.Float:
+
+                    if (!float.TryParse(
+                        value,
+                        System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        out float floatValue))
+                    {
+                        MessageBox.Show(
+                            this,
+                            $"Nilai FLOAT tidak valid: {value}",
+                            "Value tidak valid",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Warning);
+
+                        return false;
+                    }
+
+                    features.WritePlayerFloat(
+                        entry.Offset,
+                        floatValue);
+
+                    break;
+
+
+                default:
+
+                    return false;
+            }
+
+
+            UpdateEntryAddress(
+                entry);
+
+
+            statusLabel.Text =
+                $"Status: Applied {entry.Name}";
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            HandleFeatureError(
+                entry.Name,
+                ex);
+
+            return false;
+        }
+    }
+
+
+    // =========================================================
+    // UPDATE ONE ENTRY ADDRESS
+    // =========================================================
+
+    private void UpdateEntryAddress(
+        FreezeEntry entry)
+    {
+        if (!IsAttached() ||
+            memory == null)
+        {
+            entry.Address =
+                IntPtr.Zero;
+
+            entry.AddressLabel.Text =
+                "Address: -";
+
+            return;
+        }
+
+        try
+        {
+            IntPtr address =
+                memory.ResolvePointer32(
+                    0xC28B40,
+                    entry.Offset);
+
+            entry.Address =
+                address;
+
+            entry.AddressLabel.Text =
+                $"Address: 0x{address.ToInt64():X8}";
+        }
+        catch
+        {
+            entry.Address =
+                IntPtr.Zero;
+
+            entry.AddressLabel.Text =
+                "Address: ERROR";
+        }
+    }
+
+
+    // =========================================================
+    // READ CURRENT VALUE
+    // =========================================================
+
+    private void TryReadCurrentValue(
+        FreezeEntry entry)
+    {
+        if (!IsAttached() ||
+            memory == null)
+        {
+            return;
+        }
+
+        try
+        {
+            IntPtr address =
+                memory.ResolvePointer32(
+                    0xC28B40,
+                    entry.Offset);
+
+            entry.Address =
+                address;
+
+            entry.AddressLabel.Text =
+                $"Address: 0x{address.ToInt64():X8}";
+
+
+            switch (entry.Type)
+            {
+                case FreezeType.String6:
+                {
+                    byte[] data =
+                        memory.ReadBytes(
+                            address,
+                            6);
+
+                    int length = 0;
+
+                    while (
+                        length < data.Length &&
+                        data[length] != 0)
+                    {
+                        length++;
+                    }
+
+                    entry.TextBox.Text =
+                        System.Text.Encoding.ASCII.GetString(
+                            data,
+                            0,
+                            length);
+
+                    break;
+                }
+
+
+                case FreezeType.Byte:
+
+                    entry.TextBox.Text =
+                        memory.ReadByte(
+                            address)
+                        .ToString();
+
+                    break;
+
+
+                case FreezeType.Float:
+                {
+                    byte[] data =
+                        memory.ReadBytes(
+                            address,
+                            4);
+
+                    float value =
+                        BitConverter.ToSingle(
+                            data,
+                            0);
+
+                    entry.TextBox.Text =
+                        value.ToString(
+                            System.Globalization.CultureInfo.InvariantCulture);
+
+                    break;
+                }
+            }
+        }
+        catch
+        {
+            entry.AddressLabel.Text =
+                "Address: ERROR";
+        }
+    }
+
+
+    // =========================================================
+    // READ ALL CURRENT VALUES
+    // =========================================================
+
+    private void ReadAllPlayerValues()
+    {
+        if (!IsAttached() ||
+            memory == null)
+        {
+            return;
+        }
+
+        foreach (
+            var entry
+            in freezeEntries)
+        {
+            TryReadCurrentValue(
+                entry);
+        }
+    }
+
+
+    // =========================================================
+    // FREEZE TIMER
+    // =========================================================
+
+    private void FreezeTimer_Tick(
+        object? sender,
+        EventArgs e)
+    {
+        if (!IsAttached() ||
+            features == null)
+        {
+            freezeTimer.Stop();
+
+            return;
+        }
+
+        bool anyActive = false;
+
+        foreach (
+            var entry
+            in freezeEntries)
+        {
+            if (!entry.Freeze.Checked)
+                continue;
+
+            anyActive = true;
+
+            try
+            {
+                ApplyEntrySilently(
+                    entry);
+            }
+            catch
+            {
+            }
+        }
+
+        if (!anyActive)
+        {
+            freezeTimer.Stop();
+        }
+    }
+
+
+    // =========================================================
+    // SILENT FREEZE WRITE
+    // =========================================================
+
+    private void ApplyEntrySilently(
+        FreezeEntry entry)
+    {
+        if (features == null)
+            return;
+
+        string value =
+            entry.TextBox.Text.Trim();
+
+        switch (entry.Type)
+        {
+            case FreezeType.String6:
+
+                features.WritePlayerString(
+                    entry.Offset,
+                    value,
+                    6);
+
+                break;
+
+
+            case FreezeType.Byte:
+
+                if (
+                    TryParseByte(
+                        value,
+                        out byte byteValue))
+                {
+                    features.WritePlayerByte(
+                        entry.Offset,
+                        byteValue);
+                }
+
+                break;
+
+
+            case FreezeType.Float:
+
+                if (
+                    float.TryParse(
+                        value,
+                        System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        out float floatValue))
+                {
+                    features.WritePlayerFloat(
+                        entry.Offset,
+                        floatValue);
+                }
+
+                break;
+        }
+    }
+
+
+    // =========================================================
+    // LOAD PROCESSES
+    // =========================================================
+
+    private void LoadProcesses()
+    {
+        processCombo.Items.Clear();
+
+        var processes =
+            Process.GetProcesses()
+                .Where(
+                    p =>
+                    {
+                        try
+                        {
+                            return
+                                !string.IsNullOrWhiteSpace(
+                                    p.MainWindowTitle);
+                        }
+                        catch
+                        {
+                            return false;
+                        }
+                    })
+                .OrderBy(
+                    p => p.ProcessName)
+                .ToList();
+
+        foreach (
+            var process
+            in processes)
+        {
+            try
+            {
+                processCombo.Items.Add(
+                    new ProcessItem(
+                        process.Id,
+                        process.ProcessName,
+                        process.MainWindowTitle));
+            }
+            finally
+            {
+                process.Dispose();
+            }
+        }
+
+        int rfIndex = -1;
+
+        for (
+            int i = 0;
+            i < processCombo.Items.Count;
+            i++)
+        {
+            if (
+                processCombo.Items[i]
+                is ProcessItem item &&
+                item.Name.Equals(
+                    "RF_Online",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                rfIndex = i;
+                break;
+            }
+        }
+
+        if (rfIndex >= 0)
+        {
+            processCombo.SelectedIndex =
+                rfIndex;
+        }
+        else if (
+            processCombo.Items.Count > 0)
+        {
+            processCombo.SelectedIndex =
+                0;
+        }
+
+        statusLabel.Text =
+            $"Status: {processCombo.Items.Count} process";
+    }
+
+
+    // =========================================================
+    // ATTACH
+    // =========================================================
+
+    private void AttachSelectedProcess()
+    {
+        if (
+            processCombo.SelectedItem
+            is not ProcessItem item)
+        {
+            MessageBox.Show(
+                this,
+                "Pilih process terlebih dahulu.",
+                "RF Tool",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+
+            return;
+        }
+
+        try
+        {
+            DetachCurrent();
+
+            selectedProcess =
+                Process.GetProcessById(
+                    item.Id);
+
+            memory =
+                new MemoryAccess(
+                    selectedProcess);
+
+            features =
+                new FeatureManager(
+                    memory);
+
+            SetTab2Checks(
+                false);
+
+
+            ReadAllPlayerValues();
+
+            UpdateAllAddresses();
+
+
+            statusLabel.Text =
+                $"Status: Attached → {item.Name}";
+
+            attachButton.Text =
+                "ATTACHED";
+        }
+        catch (Exception ex)
+        {
+            DetachCurrent();
+
+            MessageBox.Show(
+                this,
+                $"Gagal attach:\r\n\r\n{ex.Message}",
+                "RF Tool",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
+    }
+
+
+    // =========================================================
+    // DETACH
+    // =========================================================
+
+    private void DetachCurrent()
+    {
+        freezeTimer.Stop();
+
+        try
+        {
+            features?.RestoreAll();
+        }
+        catch
+        {
+        }
+
+        features = null;
+
+        SetTab2Checks(
+            false);
+
+        // Reset address NPC
+        ResetNpcAddressLabels();
+
+        foreach (
+            var entry
+            in freezeEntries)
+        {
+            ResetCheckBox(
+                entry.Freeze,
+                false);
+
+            entry.Address =
+                IntPtr.Zero;
+
+            entry.AddressLabel.Text =
+                "Address: -";
+        }
+
+        try
+        {
+            memory?.Dispose();
+        }
+        catch
+        {
+        }
+
+        memory = null;
+
+        try
+        {
+            selectedProcess?.Dispose();
+        }
+        catch
+        {
+        }
+
+        selectedProcess = null;
+
+        attachButton.Text =
+            "ATTACH";
+
+        statusLabel.Text =
+            "Status: Not attached";
+    }
+
+
+    // =========================================================
+    // FORM CLOSING
+    // =========================================================
+
+    private void MainForm_FormClosing(
+        object? sender,
+        FormClosingEventArgs e)
+    {
+        UnregisterAllHotkeys();
+
+        SaveHotkeys();
+
+        DetachCurrent();
+    }
+
+
+    // =========================================================
+    // AUTO NPC
+    // =========================================================
+
+    private void AutoNpcCheck_CheckedChanged(
+        object? sender,
+        EventArgs e)
+    {
+        if (features == null)
+        {
+            ResetCheckBox(
+                autoNpcCheck,
+                false);
+
+            SetNpcTargetControlsEnabled(
+                false);
+
+            ResetNpcAddressLabels();
+
+            return;
+        }
+
+        try
+        {
+            bool enabled =
+                autoNpcCheck.Checked;
+
+
+            // =================================================
+            // AUTO NPC OFF
+            // =================================================
+
+            if (!enabled)
+            {
+                SetNpcTargetControlsEnabled(
+                    false);
+
+                ResetNpcAddressLabels();
+
+                statusLabel.Text =
+                    "Status: Auto NPC OFF";
+
+                return;
+            }
+
+
+            // =================================================
+            // AUTO NPC ON
+            // =================================================
+
+            var result =
+                features.FindNpc();
+
+
+            // Tampilkan address hasil FindNpc()
+            UpdateNpcAddressLabels(
+                result.Bels,
+                result.Cora,
+                result.Acc);
+
+
+            SetNpcTargetControlsEnabled(
+                true);
+
+
+            statusLabel.Text =
+                $"Status: Auto NPC ready → " +
+                $"B 0x{result.Bels.ToInt64():X8} | " +
+                $"C 0x{result.Cora.ToInt64():X8} | " +
+                $"A 0x{result.Acc.ToInt64():X8}";
+
+
+            MessageBox.Show(
+                this,
+                "AUTO NPC RESULT\r\n\r\n" +
+                $"NPC Bels : 0x{result.Bels.ToInt64():X8}\r\n" +
+                $"NPC Cora : 0x{result.Cora.ToInt64():X8}\r\n" +
+                $"NPC ACC  : 0x{result.Acc.ToInt64():X8}",
+                "Auto NPC",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+        }
+        catch (Exception ex)
+        {
+            SetNpcTargetControlsEnabled(
+                false);
+
+            ResetNpcAddressLabels();
+
+            HandleFeatureError(
+                "Auto NPC",
+                ex);
+
+            ResetCheckBox(
+                autoNpcCheck,
+                false);
+        }
+    }
+
+
+    // =========================================================
+    // STAGE 2
+    // =========================================================
+
+    private void Stage2Check_CheckedChanged(
+        object? sender,
+        EventArgs e)
+    {
+        if (features == null)
+        {
+            ResetCheckBox(
+                stage2Check,
+                false);
+
+            return;
+        }
+
+        try
+        {
+            bool enabled =
+                stage2Check.Checked;
+
+            features.Stage2(
+                enabled);
+
+            statusLabel.Text =
+                enabled
+                    ? "Status: Stage 2 ON"
+                    : "Status: Stage 2 OFF";
+        }
+        catch (Exception ex)
+        {
+            HandleFeatureError(
+                "Stage 2 True Heart Flame Launcher",
+                ex);
+
+            ResetCheckBox(
+                stage2Check,
+                false);
+        }
+    }
+
+
+    // =========================================================
+    // COMBINE
+    // =========================================================
+
+    private void CombineCheck_CheckedChanged(
+        object? sender,
+        EventArgs e)
+    {
+        if (features == null)
+        {
+            ResetCheckBox(
+                combineCheck,
+                false);
+
+            return;
+        }
+
+        try
+        {
+            bool enabled =
+                combineCheck.Checked;
+
+            features.Combine(
+                enabled);
+
+            statusLabel.Text =
+                enabled
+                    ? "Status: Combine Jarak Jauh ON"
+                    : "Status: Combine Jarak Jauh OFF";
+        }
+        catch (Exception ex)
+        {
+            HandleFeatureError(
+                "Combine Jarak Jauh",
+                ex);
+
+            ResetCheckBox(
+                combineCheck,
+                false);
+        }
+    }
+
+
+    // =========================================================
+    // SET TAB 2 CHECKBOXES
+    // =========================================================
+
+    private void SetTab2Checks(
+        bool value)
+    {
+        if (autoNpcCheck != null)
+        {
+            ResetCheckBox(
+                autoNpcCheck,
+                value);
+        }
+
+        if (stage2Check != null)
+        {
+            ResetCheckBox(
+                stage2Check,
+                value);
+        }
+
+        if (combineCheck != null)
+        {
+            ResetCheckBox(
+                combineCheck,
+                value);
+        }
+
+        SetNpcTargetControlsEnabled(
+            value &&
+            autoNpcCheck != null &&
+            autoNpcCheck.Checked);
+
+        if (!value)
+        {
+            ResetNpcAddressLabels();
+        }
+    }
+
+
+    // =========================================================
+    // ATTACHED CHECK
+    // =========================================================
+
+    private bool IsAttached()
+    {
+        return
+            memory != null &&
+            features != null &&
+            selectedProcess != null;
+    }
+
+
+    // =========================================================
+    // FREEZE TIMER CONTROL
+    // =========================================================
+
+    private void EnsureFreezeTimer()
+    {
+        if (!freezeTimer.Enabled)
+        {
+            freezeTimer.Start();
+        }
+    }
+
+
+    private void StopFreezeTimerIfNeeded()
+    {
+        bool active =
+            freezeEntries.Any(
+                x => x.Freeze.Checked);
+
+        if (!active)
+        {
+            freezeTimer.Stop();
+        }
+    }
+
+
+    // =========================================================
+    // CHECKBOX RESET
+    // =========================================================
+
+    private static void ResetCheckBox(
+        CheckBox checkBox,
+        bool value)
+    {
+        if (checkBox.Checked == value)
+            return;
+
+        checkBox.Checked =
+            value;
+    }
+
+
+    // =========================================================
+    // ERROR HANDLER
+    // =========================================================
+
+    private void HandleFeatureError(
+        string featureName,
+        Exception ex)
+    {
+        statusLabel.Text =
+            $"Error: {featureName}";
+
+        MessageBox.Show(
+            this,
+            $"{featureName} gagal.\r\n\r\n{ex.Message}",
+            "RF Tool",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Error);
+    }
+
+
+    // =========================================================
+    // BYTE PARSER
+    // =========================================================
+
+    private static bool TryParseByte(
+        string text,
+        out byte value)
+    {
+        text =
+            text.Trim();
+
+        if (
+            text.StartsWith(
+                "0x",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return byte.TryParse(
+                text[2..],
+                System.Globalization.NumberStyles.HexNumber,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out value);
+        }
+
+        return byte.TryParse(
+            text,
+            out value);
+    }
+
+
+    // =========================================================
+    // FREEZE TYPE
+    // =========================================================
+
+    private enum FreezeType
+    {
+        String6,
+        Byte,
+        Float
+    }
+
+
+    // =========================================================
+    // FREEZE ENTRY
+    // =========================================================
+
+    private sealed class FreezeEntry
+    {
+        public string Name { get; }
+
+        public long Offset { get; }
+
+        public FreezeType Type { get; }
+
+        public TextBox TextBox { get; }
+
+        public CheckBox Freeze { get; }
+
+        public Label AddressLabel { get; }
+
+        public IntPtr Address { get; set; }
+
+
+        public FreezeEntry(
+            string name,
+            long offset,
+            FreezeType type,
+            TextBox textBox,
+            CheckBox freeze,
+            Label addressLabel)
+        {
+            Name =
+                name;
+
+            Offset =
+                offset;
+
+            Type =
+                type;
+
+            TextBox =
+                textBox;
+
+            Freeze =
+                freeze;
+
+            AddressLabel =
+                addressLabel;
+
+            Address =
+                IntPtr.Zero;
+        }
+    }
+
+
+    // =========================================================
+    // PROCESS ITEM
+    // =========================================================
+
+    private sealed class ProcessItem
+    {
+        public int Id { get; }
+
+        public string Name { get; }
+
+        public string Title { get; }
+
+
+        public ProcessItem(
+            int id,
+            string name,
+            string title)
+        {
+            Id =
+                id;
+
+            Name =
+                name;
+
+            Title =
+                title;
+        }
+
+
+        public override string ToString()
+        {
+            return
+                $"{Name} ({Id})";
+        }
+    }
+}
