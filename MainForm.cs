@@ -4439,7 +4439,7 @@ public sealed class MainForm : Form
         if (features == null)
         {
             ResetCheckBox(
-                stage3Check,
+                stage3TrueHeartCheck,
                 false);
     
             return;
@@ -4448,7 +4448,7 @@ public sealed class MainForm : Form
         try
         {
             bool enabled =
-                stage3Check.Checked;
+                stage3TrueHeartCheck.Checked;
     
             features.Stage3(
                 enabled);
@@ -4465,7 +4465,7 @@ public sealed class MainForm : Form
                 ex);
     
             ResetCheckBox(
-                stage3Check,
+                stage3TrueHeartCheck,
                 false);
         }
     }
