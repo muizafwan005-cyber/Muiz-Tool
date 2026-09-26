@@ -49,6 +49,29 @@ public sealed class MainForm : Form
     private CheckBox stage2Check = null!;
     private CheckBox combineCheck = null!;
 
+    // =========================================================
+    // TAB 4 - ZOOM / AUTO FOLLOW
+    // =========================================================
+
+    private CheckBox zoomInitializeCheck = null!;
+    private CheckBox zoomCheck = null!;
+    private CheckBox autoPickV1Check = null!;
+    private CheckBox autoPickV2Check = null!;
+    private CheckBox showNameCheck = null!;
+    private CheckBox fastLootCheck = null!;
+    private CheckBox mauKeyboardCheck = null!;
+    private CheckBox reviveInactiveCheck = null!;
+    private CheckBox reviveDisableCheck = null!;
+    private CheckBox reviveAutoCheck = null!;
+    private CheckBox lockSpotCheck = null!;
+    private TextBox distanceTextBox = null!;
+    private Button distanceApplyButton = null!;
+
+    private CheckBox autoFollowInitializeCheck = null!;
+    private TextBox autoFollowNickTextBox = null!;
+    private Button autoFollowNickButton = null!;
+    private CheckBox autoFollowEnabledCheck = null!;
+
     private System.Windows.Forms.Timer freezeTimer = null!;
 
     private readonly List<FreezeEntry> freezeEntries = new();
@@ -692,6 +715,29 @@ public sealed class MainForm : Form
             tab3);
 
 
+        // =====================================================
+        // TAB 4
+        // =====================================================
+
+        var tab4 = new TabPage
+        {
+            Text =
+                "ZOOM / FOLLOW",
+
+            BackColor =
+                BackColorMain,
+
+            ForeColor =
+                ForeColorMain
+        };
+
+        tabs.TabPages.Add(
+            tab4);
+
+        BuildTab4(
+            tab4);
+
+
         Controls.Add(
             tabs);
 
@@ -1147,6 +1193,617 @@ public sealed class MainForm : Form
 
         combineCheck.CheckedChanged +=
             CombineCheck_CheckedChanged;
+    }
+
+
+    // =========================================================
+    // TAB 4 - ZOOM / AUTO FOLLOW
+    // =========================================================
+
+    private void BuildTab4(
+        TabPage tab)
+    {
+        var panel = new Panel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = BackColorMain,
+            Padding = new Padding(10),
+            AutoScroll = true
+        };
+
+        tab.Controls.Add(panel);
+
+        int y = 8;
+
+        // -----------------------------------------------------
+        // ZOOM INITIALIZE
+        // -----------------------------------------------------
+
+        zoomInitializeCheck = CreateFeatureCheckBox(
+            panel,
+            "ZOOM AOB - INITIALIZE",
+            y);
+
+        y += 42;
+
+        zoomCheck = CreateIndentedCheckBox(
+            panel,
+            "Zoom",
+            y);
+        y += 34;
+
+        autoPickV1Check = CreateIndentedCheckBox(
+            panel,
+            "Auto Pick V1",
+            y);
+        y += 34;
+
+        autoPickV2Check = CreateIndentedCheckBox(
+            panel,
+            "Auto Pick V2",
+            y);
+        y += 34;
+
+        showNameCheck = CreateIndentedCheckBox(
+            panel,
+            "Show Name",
+            y);
+        y += 34;
+
+        fastLootCheck = CreateIndentedCheckBox(
+            panel,
+            "Fast Loot",
+            y);
+        y += 34;
+
+        mauKeyboardCheck = CreateIndentedCheckBox(
+            panel,
+            "MAU Keyboard Mode",
+            y);
+        y += 34;
+
+        var reviveLabel = new Label
+        {
+            Text = "Revive",
+            AutoSize = false,
+            Location = new Point(28, y),
+            Size = new Size(260, 20),
+            ForeColor = ForeColorDim
+        };
+        panel.Controls.Add(reviveLabel);
+        y += 24;
+
+        reviveInactiveCheck = CreateIndentedCheckBox(
+            panel,
+            "Inactive",
+            y);
+        y += 30;
+
+        reviveDisableCheck = CreateIndentedCheckBox(
+            panel,
+            "Disable",
+            y);
+        y += 30;
+
+        reviveAutoCheck = CreateIndentedCheckBox(
+            panel,
+            "Auto",
+            y);
+        y += 36;
+
+        var distanceLabel = new Label
+        {
+            Text = "Distance + Lock Spot",
+            AutoSize = false,
+            Location = new Point(28, y),
+            Size = new Size(260, 20),
+            ForeColor = ForeColorDim
+        };
+        panel.Controls.Add(distanceLabel);
+        y += 24;
+
+        var distanceName = new Label
+        {
+            Text = "Distance",
+            AutoSize = false,
+            Location = new Point(28, y + 3),
+            Size = new Size(75, 24),
+            ForeColor = ForeColorMain
+        };
+        panel.Controls.Add(distanceName);
+
+        distanceTextBox = new TextBox
+        {
+            Location = new Point(105, y),
+            Size = new Size(105, 25),
+            Text = "4.0",
+            BackColor = BackColorInput,
+            ForeColor = ForeColorMain,
+            BorderStyle = BorderStyle.FixedSingle
+        };
+        panel.Controls.Add(distanceTextBox);
+
+        distanceApplyButton = new Button
+        {
+            Text = "APPLY",
+            Location = new Point(215, y),
+            Size = new Size(65, 25),
+            FlatStyle = FlatStyle.Flat,
+            BackColor = BackColorInput,
+            ForeColor = ForeColorMain
+        };
+        distanceApplyButton.FlatAppearance.BorderSize = 0;
+        panel.Controls.Add(distanceApplyButton);
+        y += 34;
+
+        lockSpotCheck = CreateIndentedCheckBox(
+            panel,
+            "Lock Spot = 01",
+            y);
+        y += 44;
+
+        // -----------------------------------------------------
+        // AUTO FOLLOW INITIALIZE
+        // -----------------------------------------------------
+
+        autoFollowInitializeCheck = CreateFeatureCheckBox(
+            panel,
+            "AUTO FOLLOW AOB - INITIALIZE",
+            y);
+        y += 42;
+
+        var nickLabel = new Label
+        {
+            Text = "Nick Follow",
+            AutoSize = false,
+            Location = new Point(28, y + 3),
+            Size = new Size(75, 24),
+            ForeColor = ForeColorMain
+        };
+        panel.Controls.Add(nickLabel);
+
+        autoFollowNickTextBox = new TextBox
+        {
+            Location = new Point(105, y),
+            Size = new Size(105, 25),
+            BackColor = BackColorInput,
+            ForeColor = ForeColorMain,
+            BorderStyle = BorderStyle.FixedSingle
+        };
+        panel.Controls.Add(autoFollowNickTextBox);
+
+        autoFollowNickButton = new Button
+        {
+            Text = "SET",
+            Location = new Point(215, y),
+            Size = new Size(65, 25),
+            FlatStyle = FlatStyle.Flat,
+            BackColor = BackColorInput,
+            ForeColor = ForeColorMain
+        };
+        autoFollowNickButton.FlatAppearance.BorderSize = 0;
+        panel.Controls.Add(autoFollowNickButton);
+        y += 34;
+
+        autoFollowEnabledCheck = CreateIndentedCheckBox(
+            panel,
+            "Auto Follow",
+            y);
+
+        autoFollowNickTextBox.Enabled = false;
+        autoFollowNickButton.Enabled = false;
+        autoFollowEnabledCheck.Enabled = false;
+
+        // -----------------------------------------------------
+        // EVENTS
+        // -----------------------------------------------------
+
+        zoomInitializeCheck.CheckedChanged +=
+            ZoomInitializeCheck_CheckedChanged;
+
+        zoomCheck.CheckedChanged +=
+            ZoomCheck_CheckedChanged;
+
+        autoPickV1Check.CheckedChanged +=
+            AutoPickV1Check_CheckedChanged;
+
+        autoPickV2Check.CheckedChanged +=
+            AutoPickV2Check_CheckedChanged;
+
+        showNameCheck.CheckedChanged +=
+            ShowNameCheck_CheckedChanged;
+
+        fastLootCheck.CheckedChanged +=
+            FastLootCheck_CheckedChanged;
+
+        mauKeyboardCheck.CheckedChanged +=
+            MauKeyboardCheck_CheckedChanged;
+
+        reviveInactiveCheck.CheckedChanged +=
+            ReviveInactiveCheck_CheckedChanged;
+
+        reviveDisableCheck.CheckedChanged +=
+            ReviveDisableCheck_CheckedChanged;
+
+        reviveAutoCheck.CheckedChanged +=
+            ReviveAutoCheck_CheckedChanged;
+
+        lockSpotCheck.CheckedChanged +=
+            LockSpotCheck_CheckedChanged;
+
+        distanceApplyButton.Click +=
+            (_, _) => ApplyDistance();
+
+        autoFollowInitializeCheck.CheckedChanged +=
+            AutoFollowInitializeCheck_CheckedChanged;
+
+        autoFollowNickButton.Click +=
+            (_, _) => ApplyAutoFollowNick();
+
+        autoFollowEnabledCheck.CheckedChanged +=
+            AutoFollowEnabledCheck_CheckedChanged;
+
+        SetTab4FeatureEnabled(false);
+    }
+
+
+    private static CheckBox CreateIndentedCheckBox(
+        Control parent,
+        string text,
+        int y)
+    {
+        var check = new CheckBox
+        {
+            Text = text,
+            AutoSize = false,
+            Location = new Point(28, y),
+            Size = new Size(255, 28),
+            ForeColor = ForeColorMain,
+            BackColor = BackColorMain,
+            FlatStyle = FlatStyle.Standard,
+            Enabled = false
+        };
+
+        parent.Controls.Add(check);
+        return check;
+    }
+
+
+    private void SetTab4FeatureEnabled(
+        bool enabled)
+    {
+        zoomCheck.Enabled = enabled;
+        autoPickV1Check.Enabled = enabled;
+        autoPickV2Check.Enabled = enabled;
+        showNameCheck.Enabled = enabled;
+        fastLootCheck.Enabled = enabled;
+        mauKeyboardCheck.Enabled = enabled;
+        reviveInactiveCheck.Enabled = enabled;
+        reviveDisableCheck.Enabled = enabled;
+        reviveAutoCheck.Enabled = enabled;
+        lockSpotCheck.Enabled = enabled;
+        distanceTextBox.Enabled = enabled;
+        distanceApplyButton.Enabled = enabled;
+    }
+
+
+    private void SetReviveSelection(
+        CheckBox selected)
+    {
+        if (!selected.Checked)
+            return;
+
+        ResetCheckBox(reviveInactiveCheck, false);
+        ResetCheckBox(reviveDisableCheck, false);
+        ResetCheckBox(reviveAutoCheck, false);
+        ResetCheckBox(selected, true);
+    }
+
+
+    private void ZoomInitializeCheck_CheckedChanged(
+        object? sender,
+        EventArgs e)
+    {
+        if (features == null)
+        {
+            ResetCheckBox(zoomInitializeCheck, false);
+            SetTab4FeatureEnabled(false);
+            return;
+        }
+
+        try
+        {
+            if (zoomInitializeCheck.Checked)
+            {
+                features.InitializeZoom();
+                SetTab4FeatureEnabled(true);
+                statusLabel.Text = "Status: Zoom AOB initialized";
+            }
+            else
+            {
+                features.ClearZoom();
+                SetTab4FeatureEnabled(false);
+                ResetCheckBox(zoomCheck, false);
+                ResetCheckBox(autoPickV1Check, false);
+                ResetCheckBox(autoPickV2Check, false);
+                ResetCheckBox(showNameCheck, false);
+                ResetCheckBox(fastLootCheck, false);
+                ResetCheckBox(mauKeyboardCheck, false);
+                ResetCheckBox(reviveInactiveCheck, false);
+                ResetCheckBox(reviveDisableCheck, false);
+                ResetCheckBox(reviveAutoCheck, false);
+                ResetCheckBox(lockSpotCheck, false);
+                statusLabel.Text = "Status: Zoom AOB cleared";
+            }
+        }
+        catch (Exception ex)
+        {
+            HandleFeatureError("Zoom Initialize", ex);
+            ResetCheckBox(zoomInitializeCheck, false);
+            SetTab4FeatureEnabled(false);
+        }
+    }
+
+
+    private void ZoomCheck_CheckedChanged(object? sender, EventArgs e)
+    {
+        if (!zoomInitializeCheck.Checked || features == null)
+        {
+            ResetCheckBox(zoomCheck, false);
+            return;
+        }
+
+        try
+        {
+            features.SetZoom(zoomCheck.Checked);
+        }
+        catch (Exception ex)
+        {
+            HandleFeatureError("Zoom", ex);
+            ResetCheckBox(zoomCheck, false);
+        }
+    }
+
+
+    private void AutoPickV1Check_CheckedChanged(object? sender, EventArgs e)
+    {
+        if (autoPickV1Check.Checked)
+            ResetCheckBox(autoPickV2Check, false);
+
+        if (!zoomInitializeCheck.Checked || features == null)
+            return;
+
+        try
+        {
+            features.SetAutoPick(autoPickV1Check.Checked ? 1 : 0);
+        }
+        catch (Exception ex)
+        {
+            HandleFeatureError("Auto Pick V1", ex);
+            ResetCheckBox(autoPickV1Check, false);
+        }
+    }
+
+
+    private void AutoPickV2Check_CheckedChanged(object? sender, EventArgs e)
+    {
+        if (autoPickV2Check.Checked)
+            ResetCheckBox(autoPickV1Check, false);
+
+        if (!zoomInitializeCheck.Checked || features == null)
+            return;
+
+        try
+        {
+            features.SetAutoPick(autoPickV2Check.Checked ? 2 : 0);
+        }
+        catch (Exception ex)
+        {
+            HandleFeatureError("Auto Pick V2", ex);
+            ResetCheckBox(autoPickV2Check, false);
+        }
+    }
+
+
+    private void ShowNameCheck_CheckedChanged(object? sender, EventArgs e)
+    {
+        if (!zoomInitializeCheck.Checked || features == null)
+            return;
+
+        try { features.SetShowName(showNameCheck.Checked); }
+        catch (Exception ex)
+        {
+            HandleFeatureError("Show Name", ex);
+            ResetCheckBox(showNameCheck, false);
+        }
+    }
+
+
+    private void FastLootCheck_CheckedChanged(object? sender, EventArgs e)
+    {
+        if (!zoomInitializeCheck.Checked || features == null)
+            return;
+
+        try { features.SetFastLoot(fastLootCheck.Checked); }
+        catch (Exception ex)
+        {
+            HandleFeatureError("Fast Loot", ex);
+            ResetCheckBox(fastLootCheck, false);
+        }
+    }
+
+
+    private void MauKeyboardCheck_CheckedChanged(object? sender, EventArgs e)
+    {
+        if (!zoomInitializeCheck.Checked || features == null)
+            return;
+
+        try { features.SetMauKeyboardMode(mauKeyboardCheck.Checked); }
+        catch (Exception ex)
+        {
+            HandleFeatureError("MAU Keyboard Mode", ex);
+            ResetCheckBox(mauKeyboardCheck, false);
+        }
+    }
+
+
+    private void ReviveInactiveCheck_CheckedChanged(object? sender, EventArgs e)
+    {
+        if (reviveInactiveCheck.Checked)
+            SetReviveSelection(reviveInactiveCheck);
+        if (!zoomInitializeCheck.Checked || features == null) return;
+        try { features.SetRevive(reviveInactiveCheck.Checked ? 0 : 0); }
+        catch (Exception ex) { HandleFeatureError("Revive", ex); }
+    }
+
+
+    private void ReviveDisableCheck_CheckedChanged(object? sender, EventArgs e)
+    {
+        if (reviveDisableCheck.Checked)
+            SetReviveSelection(reviveDisableCheck);
+        if (!zoomInitializeCheck.Checked || features == null) return;
+        try { features.SetRevive(reviveDisableCheck.Checked ? 1 : 0); }
+        catch (Exception ex) { HandleFeatureError("Revive", ex); }
+    }
+
+
+    private void ReviveAutoCheck_CheckedChanged(object? sender, EventArgs e)
+    {
+        if (reviveAutoCheck.Checked)
+            SetReviveSelection(reviveAutoCheck);
+        if (!zoomInitializeCheck.Checked || features == null) return;
+        try { features.SetRevive(reviveAutoCheck.Checked ? 2 : 0); }
+        catch (Exception ex) { HandleFeatureError("Revive", ex); }
+    }
+
+
+    private void LockSpotCheck_CheckedChanged(object? sender, EventArgs e)
+    {
+        if (!zoomInitializeCheck.Checked || features == null)
+            return;
+
+        try { features.SetLockSpot(lockSpotCheck.Checked); }
+        catch (Exception ex)
+        {
+            HandleFeatureError("Lock Spot", ex);
+            ResetCheckBox(lockSpotCheck, false);
+        }
+    }
+
+
+    private void ApplyDistance()
+    {
+        if (!zoomInitializeCheck.Checked || features == null)
+            return;
+
+        if (!float.TryParse(
+                distanceTextBox.Text,
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out float value))
+        {
+            statusLabel.Text = "Status: Distance tidak valid";
+            return;
+        }
+
+        try
+        {
+            features.SetDistance(value);
+            statusLabel.Text = $"Status: Distance = {value.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+        }
+        catch (Exception ex)
+        {
+            HandleFeatureError("Distance", ex);
+        }
+    }
+
+
+    private void AutoFollowInitializeCheck_CheckedChanged(
+        object? sender,
+        EventArgs e)
+    {
+        if (features == null)
+        {
+            ResetCheckBox(autoFollowInitializeCheck, false);
+            return;
+        }
+
+        try
+        {
+            if (autoFollowInitializeCheck.Checked)
+            {
+                features.InitializeAutoFollow();
+                autoFollowNickTextBox.Text = features.ReadAutoFollowNick();
+                autoFollowNickTextBox.Enabled = true;
+                autoFollowNickButton.Enabled = true;
+                autoFollowEnabledCheck.Enabled = true;
+                statusLabel.Text = "Status: Auto Follow AOB initialized";
+            }
+            else
+            {
+                features.ClearAutoFollow();
+                autoFollowNickTextBox.Text = "";
+                autoFollowNickTextBox.Enabled = false;
+                autoFollowNickButton.Enabled = false;
+                ResetCheckBox(autoFollowEnabledCheck, false);
+                autoFollowEnabledCheck.Enabled = false;
+                statusLabel.Text = "Status: Auto Follow AOB cleared";
+            }
+        }
+        catch (Exception ex)
+        {
+            HandleFeatureError("Auto Follow Initialize", ex);
+            ResetCheckBox(autoFollowInitializeCheck, false);
+            autoFollowNickTextBox.Enabled = false;
+            autoFollowNickButton.Enabled = false;
+            autoFollowEnabledCheck.Enabled = false;
+        }
+    }
+
+
+    private void ApplyAutoFollowNick()
+    {
+        if (!autoFollowInitializeCheck.Checked || features == null)
+            return;
+
+        try
+        {
+            string nick = autoFollowNickTextBox.Text.Trim();
+            if (nick.Length == 0)
+                return;
+
+            features.SetAutoFollowNick(nick);
+            features.SetAutoFollow(true);
+            ResetCheckBox(autoFollowEnabledCheck, true);
+            statusLabel.Text = $"Status: Auto Follow → {nick}";
+        }
+        catch (Exception ex)
+        {
+            HandleFeatureError("Nick Follow", ex);
+            ResetCheckBox(autoFollowEnabledCheck, false);
+        }
+    }
+
+
+    private void AutoFollowEnabledCheck_CheckedChanged(
+        object? sender,
+        EventArgs e)
+    {
+        if (!autoFollowInitializeCheck.Checked || features == null)
+        {
+            ResetCheckBox(autoFollowEnabledCheck, false);
+            return;
+        }
+
+        try
+        {
+            features.SetAutoFollow(autoFollowEnabledCheck.Checked);
+        }
+        catch (Exception ex)
+        {
+            HandleFeatureError("Auto Follow", ex);
+            ResetCheckBox(autoFollowEnabledCheck, false);
+        }
     }
 
 
@@ -3377,6 +4034,22 @@ public sealed class MainForm : Form
 
         SetTab2Checks(
             false);
+
+        if (zoomInitializeCheck != null)
+        {
+            ResetCheckBox(zoomInitializeCheck, false);
+            SetTab4FeatureEnabled(false);
+        }
+
+        if (autoFollowInitializeCheck != null)
+        {
+            ResetCheckBox(autoFollowInitializeCheck, false);
+            ResetCheckBox(autoFollowEnabledCheck, false);
+            autoFollowNickTextBox.Text = "";
+            autoFollowNickTextBox.Enabled = false;
+            autoFollowNickButton.Enabled = false;
+            autoFollowEnabledCheck.Enabled = false;
+        }
 
         // Reset address NPC
         ResetNpcAddressLabels();
