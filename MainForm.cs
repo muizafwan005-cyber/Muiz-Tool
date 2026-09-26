@@ -1230,13 +1230,19 @@ public sealed class MainForm : Form
 
         autoNpcCheck.CheckedChanged +=
             AutoNpcCheck_CheckedChanged;
-
+        
         stage2Check.CheckedChanged +=
             Stage2Check_CheckedChanged;
-            
+        
         stage5RomanticCheck.CheckedChanged +=
             Stage5RomanticCheck_CheckedChanged;
-
+        
+        stage3Check.CheckedChanged +=
+            Stage3Check_CheckedChanged;
+        
+        infernalDragonboneCheck.CheckedChanged +=
+            InfernalDragonboneCheck_CheckedChanged;
+        
         combineCheck.CheckedChanged +=
             CombineCheck_CheckedChanged;
     }
@@ -4421,7 +4427,90 @@ public sealed class MainForm : Form
                 false);
         }
     }
-
+    
+    // =========================================================
+    // STAGE 3
+    // =========================================================
+    
+    private void Stage3Check_CheckedChanged(
+        object? sender,
+        EventArgs e)
+    {
+        if (features == null)
+        {
+            ResetCheckBox(
+                stage3Check,
+                false);
+    
+            return;
+        }
+    
+        try
+        {
+            bool enabled =
+                stage3Check.Checked;
+    
+            features.Stage3(
+                enabled);
+    
+            statusLabel.Text =
+                enabled
+                    ? "Status: Stage 3 True Heart Flame ON"
+                    : "Status: Stage 3 True Heart Flame OFF";
+        }
+        catch (Exception ex)
+        {
+            HandleFeatureError(
+                "Stage 3 True Heart Flame Launcher",
+                ex);
+    
+            ResetCheckBox(
+                stage3Check,
+                false);
+        }
+    }
+    
+    // =========================================================
+    // INFERNAL DRAGONBONE
+    // =========================================================
+    
+    private void InfernalDragonboneCheck_CheckedChanged(
+        object? sender,
+        EventArgs e)
+    {
+        if (features == null)
+        {
+            ResetCheckBox(
+                infernalDragonboneCheck,
+                false);
+    
+            return;
+        }
+    
+        try
+        {
+            bool enabled =
+                infernalDragonboneCheck.Checked;
+    
+            features.InfernalDragonbone(
+                enabled);
+    
+            statusLabel.Text =
+                enabled
+                    ? "Status: Infernal Dragonbone ON"
+                    : "Status: Infernal Dragonbone OFF";
+        }
+        catch (Exception ex)
+        {
+            HandleFeatureError(
+                "Infernal Dragonbone Flame Launcher",
+                ex);
+    
+            ResetCheckBox(
+                infernalDragonboneCheck,
+                false);
+        }
+    }
     // =========================================================
     // COMBINE
     // =========================================================
