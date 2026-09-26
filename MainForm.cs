@@ -47,6 +47,9 @@ public sealed class MainForm : Form
     private Label npcAccAddressLabel = null!;
 
     private CheckBox stage2Check = null!;
+    private CheckBox stage5RomanticCheck = null!;
+    private CheckBox stage3TrueHeartCheck = null!;
+    private CheckBox infernalDragonboneCheck = null!;
     private CheckBox combineCheck = null!;
 
     // =========================================================
@@ -1160,28 +1163,66 @@ public sealed class MainForm : Form
         // =====================================================
         // STAGE 2
         // =====================================================
-
+        
         y += 190;
-
+        
         stage2Check =
             CreateFeatureCheckBox(
                 panel,
                 "Stage 2 True Heart Flame Launcher",
                 y);
-
-
+        
+        
+        // =====================================================
+        // STAGE 5
+        // =====================================================
+        
+        y += 48;
+        
+        stage5RomanticCheck =
+            CreateFeatureCheckBox(
+                panel,
+                "Stage 5 Romantic Flame Launcher [30 Days]",
+                y);
+        
+        
+        // =====================================================
+        // STAGE 3
+        // =====================================================
+        
+        y += 48;
+        
+        stage3TrueHeartCheck =
+            CreateFeatureCheckBox(
+                panel,
+                "Stage 3 True Heart Flame Launcher",
+                y);
+        
+        
+        // =====================================================
+        // INFERNAL DRAGONBONE
+        // =====================================================
+        
+        y += 48;
+        
+        infernalDragonboneCheck =
+            CreateFeatureCheckBox(
+                panel,
+                "Infernal Dragonbone Flame Launcher",
+                y);
+        
+        
         // =====================================================
         // COMBINE
         // =====================================================
-
+        
         y += 48;
-
+        
         combineCheck =
             CreateFeatureCheckBox(
                 panel,
                 "Combine Jarak Jauh",
                 y);
-
 
         // =====================================================
         // EVENTS
@@ -1192,6 +1233,9 @@ public sealed class MainForm : Form
 
         stage2Check.CheckedChanged +=
             Stage2Check_CheckedChanged;
+            
+        stage5RomanticCheck.CheckedChanged +=
+            Stage5RomanticCheck_CheckedChanged;
 
         combineCheck.CheckedChanged +=
             CombineCheck_CheckedChanged;
@@ -4336,7 +4380,47 @@ public sealed class MainForm : Form
                 false);
         }
     }
-
+    // =========================================================
+    // STAGE 5 ROMANTIC
+    // =========================================================
+    
+    private void Stage5RomanticCheck_CheckedChanged(
+        object? sender,
+        EventArgs e)
+    {
+        if (features == null)
+        {
+            ResetCheckBox(
+                stage5RomanticCheck,
+                false);
+    
+            return;
+        }
+    
+        try
+        {
+            bool enabled =
+                stage5RomanticCheck.Checked;
+    
+            features.Stage5Romantic(
+                enabled);
+    
+            statusLabel.Text =
+                enabled
+                    ? "Status: Stage 5 Romantic ON"
+                    : "Status: Stage 5 Romantic OFF";
+        }
+        catch (Exception ex)
+        {
+            HandleFeatureError(
+                "Stage 5 Romantic Flame Launcher [30 Days]",
+                ex);
+    
+            ResetCheckBox(
+                stage5RomanticCheck,
+                false);
+        }
+    }
 
     // =========================================================
     // COMBINE
