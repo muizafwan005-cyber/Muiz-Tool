@@ -23,6 +23,9 @@ public sealed class FeatureManager
 
     private IntPtr combineBase = IntPtr.Zero;
     private IntPtr stage2Address = IntPtr.Zero;
+    private IntPtr stage5Address = IntPtr.Zero;
+    private IntPtr stage3Address = IntPtr.Zero;
+    private IntPtr infernalDragonboneAddress = IntPtr.Zero;
 
     // =========================================================
     // NPC DYNAMIC ADDRESSES
