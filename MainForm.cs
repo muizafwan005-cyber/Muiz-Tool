@@ -1300,13 +1300,13 @@ public sealed class MainForm : Form
             "Auto Pick V1",
             zoomY);
         zoomY += 34;
-
-        showNameCheck = CreateIndentedCheckBox(
+        
+        autoPickV2Check = CreateIndentedCheckBox(
             zoomFeaturePanel,
-            "Show Name",
+            "Auto Pick V2",
             zoomY);
         zoomY += 34;
-
+        
         showNameCheck = CreateIndentedCheckBox(
             zoomFeaturePanel,
             "Show Name",
