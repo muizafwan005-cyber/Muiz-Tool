@@ -1266,71 +1266,86 @@ public sealed class MainForm : Form
     
         int y = 8;
     
-        // -----------------------------------------------------
+        // =========================================================
         // ZOOM INITIALIZE
-        // -----------------------------------------------------
+        // =========================================================
     
-        zoomInitializeCheck = CreateFeatureCheckBox(
-            panel,
-            "ZOOM AOB - INITIALIZE",
-            y);
+        zoomInitializeCheck =
+            CreateFeatureCheckBox(
+                panel,
+                "ZOOM AOB - INITIALIZE",
+                y);
     
         y += 42;
     
-        // -----------------------------------------------------
+        // =========================================================
         // ZOOM FEATURE PANEL
-        // -----------------------------------------------------
+        // =========================================================
     
         zoomFeaturePanel = new Panel
         {
             Location = new Point(0, y),
-            Size = new Size(300, 500),
-            BackColor = BackColorMain
+            Size = new Size(300, 0),
+            BackColor = BackColorMain,
+            Visible = false
         };
     
-        panel.Controls.Add(zoomFeaturePanel);
+        panel.Controls.Add(
+            zoomFeaturePanel);
     
         int zoomY = 0;
     
-        zoomCheck = CreateIndentedCheckBox(
-            zoomFeaturePanel,
-            "Zoom",
-            zoomY);
+        zoomCheck =
+            CreateIndentedCheckBox(
+                zoomFeaturePanel,
+                "Zoom",
+                zoomY);
+    
         zoomY += 34;
     
-        autoPickV1Check = CreateIndentedCheckBox(
-            zoomFeaturePanel,
-            "Auto Pick V1",
-            zoomY);
+        autoPickV1Check =
+            CreateIndentedCheckBox(
+                zoomFeaturePanel,
+                "Auto Pick V1",
+                zoomY);
+    
         zoomY += 34;
     
-        autoPickV2Check = CreateIndentedCheckBox(
-            zoomFeaturePanel,
-            "Auto Pick V2",
-            zoomY);
+        autoPickV2Check =
+            CreateIndentedCheckBox(
+                zoomFeaturePanel,
+                "Auto Pick V2",
+                zoomY);
+    
         zoomY += 34;
     
-        showNameCheck = CreateIndentedCheckBox(
-            zoomFeaturePanel,
-            "Show Name",
-            zoomY);
+        showNameCheck =
+            CreateIndentedCheckBox(
+                zoomFeaturePanel,
+                "Show Name",
+                zoomY);
+    
         zoomY += 34;
     
-        fastLootCheck = CreateIndentedCheckBox(
-            zoomFeaturePanel,
-            "Fast Loot",
-            zoomY);
+        fastLootCheck =
+            CreateIndentedCheckBox(
+                zoomFeaturePanel,
+                "Fast Loot",
+                zoomY);
+    
         zoomY += 34;
     
-        mauKeyboardCheck = CreateIndentedCheckBox(
-            zoomFeaturePanel,
-            "MAU Keyboard Mode",
-            zoomY);
+        mauKeyboardCheck =
+            CreateIndentedCheckBox(
+                zoomFeaturePanel,
+                "MAU Keyboard Mode",
+                zoomY);
+    
         zoomY += 36;
     
-        // -----------------------------------------------------
+        // =========================================================
         // REVIVE
-        // -----------------------------------------------------
+        // =========================================================
     
         var reviveLabel = new Label
         {
@@ -1342,31 +1357,38 @@ public sealed class MainForm : Form
             BackColor = BackColorMain
         };
     
-        zoomFeaturePanel.Controls.Add(reviveLabel);
+        zoomFeaturePanel.Controls.Add(
+            reviveLabel);
     
         zoomY += 24;
     
-        reviveInactiveCheck = CreateIndentedCheckBox(
-            zoomFeaturePanel,
-            "Inactive",
-            zoomY);
+        reviveInactiveCheck =
+            CreateIndentedCheckBox(
+                zoomFeaturePanel,
+                "Inactive",
+                zoomY);
+    
         zoomY += 30;
     
-        reviveDisableCheck = CreateIndentedCheckBox(
-            zoomFeaturePanel,
-            "Disable",
-            zoomY);
+        reviveDisableCheck =
+            CreateIndentedCheckBox(
+                zoomFeaturePanel,
+                "Disable",
+                zoomY);
+    
         zoomY += 30;
     
-        reviveAutoCheck = CreateIndentedCheckBox(
-            zoomFeaturePanel,
-            "Auto",
-            zoomY);
+        reviveAutoCheck =
+            CreateIndentedCheckBox(
+                zoomFeaturePanel,
+                "Auto",
+                zoomY);
+    
         zoomY += 36;
     
-        // -----------------------------------------------------
+        // =========================================================
         // DISTANCE + LOCK SPOT
-        // -----------------------------------------------------
+        // =========================================================
     
         var distanceLabel = new Label
         {
@@ -1378,7 +1400,8 @@ public sealed class MainForm : Form
             BackColor = BackColorMain
         };
     
-        zoomFeaturePanel.Controls.Add(distanceLabel);
+        zoomFeaturePanel.Controls.Add(
+            distanceLabel);
     
         zoomY += 24;
     
@@ -1392,7 +1415,8 @@ public sealed class MainForm : Form
             BackColor = BackColorMain
         };
     
-        zoomFeaturePanel.Controls.Add(distanceName);
+        zoomFeaturePanel.Controls.Add(
+            distanceName);
     
         distanceTextBox = new TextBox
         {
@@ -1404,7 +1428,8 @@ public sealed class MainForm : Form
             BorderStyle = BorderStyle.FixedSingle
         };
     
-        zoomFeaturePanel.Controls.Add(distanceTextBox);
+        zoomFeaturePanel.Controls.Add(
+            distanceTextBox);
     
         distanceApplyButton = new Button
         {
@@ -1423,21 +1448,21 @@ public sealed class MainForm : Form
     
         zoomY += 34;
     
-        lockSpotCheck = CreateIndentedCheckBox(
-            zoomFeaturePanel,
-            "Lock Spot = 01",
-            zoomY);
+        lockSpotCheck =
+            CreateIndentedCheckBox(
+                zoomFeaturePanel,
+                "Lock Spot = 01",
+                zoomY);
     
-        // -----------------------------------------------------
-        // MOVE AUTO FOLLOW BELOW ZOOM PANEL
-        // -----------------------------------------------------
-    
-        y += 500;
-        y += 16;
-    
-        // -----------------------------------------------------
+        // =========================================================
         // AUTO FOLLOW INITIALIZE
-        // -----------------------------------------------------
+        // =========================================================
+    
+        // Simpan tinggi isi Zoom.
+        int zoomContentHeight =
+            zoomY + 34;
+    
+        y += zoomContentHeight;
     
         autoFollowInitializeCheck =
             CreateFeatureCheckBox(
@@ -1445,17 +1470,23 @@ public sealed class MainForm : Form
                 "AUTO FOLLOW AOB - INITIALIZE",
                 y);
     
-        y += 42;
-    
-        // -----------------------------------------------------
+        // =========================================================
         // AUTO FOLLOW FEATURE PANEL
-        // -----------------------------------------------------
+        // =========================================================
     
         autoFollowFeaturePanel = new Panel
         {
-            Location = new Point(0, y),
-            Size = new Size(300, 100),
-            BackColor = BackColorMain
+            Location = new Point(
+                0,
+                autoFollowInitializeCheck.Bottom + 6),
+    
+            Size = new Size(
+                300,
+                68),
+    
+            BackColor = BackColorMain,
+    
+            Visible = false
         };
     
         panel.Controls.Add(
@@ -1470,7 +1501,11 @@ public sealed class MainForm : Form
             Location = new Point(
                 28,
                 autoFollowY + 3),
-            Size = new Size(75, 24),
+    
+            Size = new Size(
+                75,
+                24),
+    
             ForeColor = ForeColorMain,
             BackColor = BackColorMain
         };
@@ -1480,8 +1515,14 @@ public sealed class MainForm : Form
     
         autoFollowNickTextBox = new TextBox
         {
-            Location = new Point(105, autoFollowY),
-            Size = new Size(105, 25),
+            Location = new Point(
+                105,
+                autoFollowY),
+    
+            Size = new Size(
+                105,
+                25),
+    
             BackColor = BackColorInput,
             ForeColor = ForeColorMain,
             BorderStyle = BorderStyle.FixedSingle
@@ -1493,8 +1534,15 @@ public sealed class MainForm : Form
         autoFollowNickButton = new Button
         {
             Text = "SET",
-            Location = new Point(215, autoFollowY),
-            Size = new Size(65, 25),
+    
+            Location = new Point(
+                215,
+                autoFollowY),
+    
+            Size = new Size(
+                65,
+                25),
+    
             FlatStyle = FlatStyle.Flat,
             BackColor = BackColorInput,
             ForeColor = ForeColorMain
@@ -1513,13 +1561,17 @@ public sealed class MainForm : Form
                 "Auto Follow",
                 autoFollowY);
     
+        // =========================================================
+        // DEFAULT STATE
+        // =========================================================
+    
         autoFollowNickTextBox.Enabled = false;
         autoFollowNickButton.Enabled = false;
         autoFollowEnabledCheck.Enabled = false;
     
-        // -----------------------------------------------------
+        // =========================================================
         // EVENTS
-        // -----------------------------------------------------
+        // =========================================================
     
         zoomInitializeCheck.CheckedChanged +=
             ZoomInitializeCheck_CheckedChanged;
@@ -1566,7 +1618,12 @@ public sealed class MainForm : Form
         autoFollowEnabledCheck.CheckedChanged +=
             AutoFollowEnabledCheck_CheckedChanged;
     
+        // =========================================================
+        // INITIAL STATE
+        // =========================================================
+    
         SetTab4FeatureEnabled(false);
+        SetAutoFollowFeatureEnabled(false);
     }
 
     private static CheckBox CreateIndentedCheckBox(
@@ -1590,45 +1647,50 @@ public sealed class MainForm : Form
         return check;
     }
 
-        private void SetTab4FeatureEnabled(
-            bool enabled)
+    private void SetTab4FeatureEnabled(bool enabled)
+    {
+        zoomFeaturePanel.Visible = enabled;
+    
+        zoomCheck.Enabled = enabled;
+        autoPickV1Check.Enabled = enabled;
+        autoPickV2Check.Enabled = enabled;
+        showNameCheck.Enabled = enabled;
+        fastLootCheck.Enabled = enabled;
+        mauKeyboardCheck.Enabled = enabled;
+        reviveInactiveCheck.Enabled = enabled;
+        reviveDisableCheck.Enabled = enabled;
+        reviveAutoCheck.Enabled = enabled;
+        lockSpotCheck.Enabled = enabled;
+        distanceTextBox.Enabled = enabled;
+        distanceApplyButton.Enabled = enabled;
+    
+        // =========================================================
+        // ZOOM PANEL HEIGHT
+        // =========================================================
+    
+        if (enabled)
         {
-            zoomCheck.Enabled = enabled;
-            zoomCheck.Visible = enabled;
-        
-            autoPickV1Check.Enabled = enabled;
-            autoPickV1Check.Visible = enabled;
-        
-            autoPickV2Check.Enabled = enabled;
-            autoPickV2Check.Visible = enabled;
-        
-            showNameCheck.Enabled = enabled;
-            showNameCheck.Visible = enabled;
-        
-            fastLootCheck.Enabled = enabled;
-            fastLootCheck.Visible = enabled;
-        
-            mauKeyboardCheck.Enabled = enabled;
-            mauKeyboardCheck.Visible = enabled;
-        
-            reviveInactiveCheck.Enabled = enabled;
-            reviveInactiveCheck.Visible = enabled;
-        
-            reviveDisableCheck.Enabled = enabled;
-            reviveDisableCheck.Visible = enabled;
-        
-            reviveAutoCheck.Enabled = enabled;
-            reviveAutoCheck.Visible = enabled;
-        
-            lockSpotCheck.Enabled = enabled;
-            lockSpotCheck.Visible = enabled;
-        
-            distanceTextBox.Enabled = enabled;
-            distanceTextBox.Visible = enabled;
-        
-            distanceApplyButton.Enabled = enabled;
-            distanceApplyButton.Visible = enabled;
+            zoomFeaturePanel.Height = 354;
         }
+        else
+        {
+            zoomFeaturePanel.Height = 0;
+        }
+    
+        // =========================================================
+        // AUTO FOLLOW HEADER POSITION
+        // =========================================================
+    
+        autoFollowInitializeCheck.Top =
+            zoomFeaturePanel.Bottom + 6;
+    
+        // =========================================================
+        // AUTO FOLLOW CONTENT POSITION
+        // =========================================================
+    
+        autoFollowFeaturePanel.Top =
+            autoFollowInitializeCheck.Bottom + 6;
+    }
 
     private void SetReviveSelection(
         CheckBox selected)
@@ -1920,17 +1982,13 @@ public sealed class MainForm : Form
         }
     }
 
-    private void SetAutoFollowFeatureEnabled(
-        bool enabled)
+    private void SetAutoFollowFeatureEnabled(bool enabled)
     {
+        autoFollowFeaturePanel.Visible = enabled;
+    
         autoFollowNickTextBox.Enabled = enabled;
-        autoFollowNickTextBox.Visible = enabled;
-    
         autoFollowNickButton.Enabled = enabled;
-        autoFollowNickButton.Visible = enabled;
-    
         autoFollowEnabledCheck.Enabled = enabled;
-        autoFollowEnabledCheck.Visible = enabled;
     }
 
     private void ApplyAutoFollowNick()
