@@ -1670,7 +1670,7 @@ public sealed class MainForm : Form
     
         if (enabled)
         {
-            zoomFeaturePanel.Height = 354;
+            zoomFeaturePanel.Height = 390;
         }
         else
         {
