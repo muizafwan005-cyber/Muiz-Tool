@@ -650,7 +650,134 @@ public sealed class FeatureManager
         throw new InvalidOperationException(
             "Stage 5 Romantic: address target tidak ditemukan.");
     }
-
+    
+    // =========================================================
+    // STAGE 3 TRUE HEART FLAME LAUNCHER
+    // =========================================================
+    
+    public void Stage3(
+        bool enabled)
+    {
+        const string target =
+            "Stage 3 True Heart Flame Launcher";
+    
+        if (!enabled)
+            return;
+    
+        var targetBytes =
+            Encoding.ASCII.GetBytes(
+                target);
+    
+        string pattern =
+            string.Join(
+                " ",
+                targetBytes.Select(
+                    x => x.ToString("X2")));
+    
+        var hits =
+            scanner.ScanProcess(
+                pattern);
+    
+        if (hits.Count == 0)
+        {
+            throw new InvalidOperationException(
+                "Stage 3 True Heart Flame Launcher tidak ditemukan.");
+        }
+    
+        foreach (var nameAddress in hits)
+        {
+            var rageAddress =
+                new IntPtr(
+                    nameAddress.ToInt64() +
+                    0xDE);
+    
+            var bytes =
+                memory.ReadBytes(
+                    rageAddress,
+                    2);
+    
+            if (
+                (bytes[0] == 0x61 &&
+                 bytes[1] == 0x43) ||
+                (bytes[0] == 0xB4 &&
+                 bytes[1] == 0x43))
+            {
+                memory.WriteBytes(
+                    rageAddress,
+                    0xB4,
+                    0x43);
+    
+                return;
+            }
+        }
+    
+        throw new InvalidOperationException(
+            "Stage 3: address target tidak ditemukan.");
+    }
+    
+    // =========================================================
+    // INFERNAL DRAGONBONE FLAME LAUNCHER
+    // =========================================================
+    
+    public void InfernalDragonbone(
+        bool enabled)
+    {
+        const string target =
+            "Infernal Dragonbone Flame Launcher [Rare M]";
+    
+        if (!enabled)
+            return;
+    
+        var targetBytes =
+            Encoding.ASCII.GetBytes(
+                target);
+    
+        string pattern =
+            string.Join(
+                " ",
+                targetBytes.Select(
+                    x => x.ToString("X2")));
+    
+        var hits =
+            scanner.ScanProcess(
+                pattern);
+    
+        if (hits.Count == 0)
+        {
+            throw new InvalidOperationException(
+                "Infernal Dragonbone Flame Launcher [Rare M] tidak ditemukan.");
+        }
+    
+        foreach (var nameAddress in hits)
+        {
+            var rageAddress =
+                new IntPtr(
+                    nameAddress.ToInt64() +
+                    0xDE);
+    
+            var bytes =
+                memory.ReadBytes(
+                    rageAddress,
+                    2);
+    
+            if (
+                (bytes[0] == 0x61 &&
+                 bytes[1] == 0x43) ||
+                (bytes[0] == 0xB4 &&
+                 bytes[1] == 0x43))
+            {
+                memory.WriteBytes(
+                    rageAddress,
+                    0xB4,
+                    0x43);
+    
+                return;
+            }
+        }
+    
+        throw new InvalidOperationException(
+            "Infernal Dragonbone: address target tidak ditemukan.");
+    }
     // =========================================================
     // AUTO NPC
     // =========================================================
