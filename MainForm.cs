@@ -1784,25 +1784,29 @@ public sealed class MainForm : Form
         autoFollowInitializeCheck.Top =
             zoomFeaturePanel.Bottom + 6;
     
+
         // =========================================================
         // AUTO FOLLOW CONTENT POSITION
         // =========================================================
-    
 
         autoFollowFeaturePanel.Top =
             autoFollowInitializeCheck.Bottom + 6;
 
-        // ESP header dan panel
+        // =========================================================
+        // ESP HEADER DAN PANEL POSITION
+        // =========================================================
+
         espInitializeCheck.Top =
             autoFollowFeaturePanel.Bottom + 6;
 
         espFeaturePanel.Top =
             espInitializeCheck.Bottom + 6;
     }
-            
+
     private void SetReviveSelection(
         CheckBox selected)
     {
+
         if (!selected.Checked)
             return;
 
