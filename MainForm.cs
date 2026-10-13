@@ -1666,6 +1666,46 @@ public sealed class MainForm : Form
         
         // Kondisi awal
         SetEspFeatureEnabled(false);
+
+        // =========================================================
+        // PURSE CHARGER AOB - INITIALIZE
+        // =========================================================
+
+        purseChargerInitializeCheck =
+            CreateFeatureCheckBox(
+                panel,
+                "PURSE CHARGER AOB - INITIALIZE",
+                espInitializeCheck.Bottom + 6);
+
+        // =========================================================
+        // PURSE CHARGER FEATURE PANEL
+        // =========================================================
+
+        purseChargerFeaturePanel = new Panel
+        {
+            Location = new Point(
+                0,
+                purseChargerInitializeCheck.Bottom + 6),
+            Size = new Size(300, 34),
+            BackColor = BackColorMain,
+            Visible = false
+        };
+
+        panel.Controls.Add(purseChargerFeaturePanel);
+
+        purseChargerAlwaysOnCheck =
+            CreateIndentedCheckBox(
+                purseChargerFeaturePanel,
+                "Purse Charger Always On",
+                0);
+
+        // Timer Purse Charger: interval 50 ms.
+        purseChargerTimer =
+            new System.Windows.Forms.Timer
+            {
+                Interval = 50
+            };
+
         // =========================================================
         // DEFAULT STATE
         // =========================================================
@@ -1751,6 +1791,19 @@ public sealed class MainForm : Form
             (_, _) => ApplyEspFeature(7, espLockSpotLootingCheck);
 
         // =========================================================
+        // PURSE CHARGER EVENTS
+        // =========================================================
+
+        purseChargerInitializeCheck.CheckedChanged +=
+            PurseChargerInitializeCheck_CheckedChanged;
+
+        purseChargerAlwaysOnCheck.CheckedChanged +=
+            PurseChargerAlwaysOnCheck_CheckedChanged;
+
+        purseChargerTimer.Tick +=
+            PurseChargerTimer_Tick;
+
+        // =========================================================
         // INITIAL STATE
         // =========================================================
     
@@ -1779,10 +1832,12 @@ public sealed class MainForm : Form
         return check;
     }
 
+
     private void SetTab4FeatureEnabled(bool enabled)
     {
         zoomFeaturePanel.Visible = enabled;
-    
+        zoomFeaturePanel.Height = enabled ? 390 : 0;
+
         zoomCheck.Enabled = enabled;
         autoPickV1Check.Enabled = enabled;
         autoPickV2Check.Enabled = enabled;
@@ -1795,6 +1850,9 @@ public sealed class MainForm : Form
         lockSpotCheck.Enabled = enabled;
         distanceTextBox.Enabled = enabled;
         distanceApplyButton.Enabled = enabled;
+
+        UpdateTab4Layout();
+    }
     
         // =========================================================
         // ZOOM PANEL HEIGHT
@@ -2128,24 +2186,58 @@ public sealed class MainForm : Form
         }
     }
 
-
     private void SetAutoFollowFeatureEnabled(bool enabled)
     {
         autoFollowFeaturePanel.Visible = enabled;
         autoFollowFeaturePanel.Height = enabled ? 68 : 0;
-    
+
         autoFollowNickTextBox.Enabled = enabled;
         autoFollowNickButton.Enabled = enabled;
         autoFollowEnabledCheck.Enabled = enabled;
-    
-        // Pindahkan ESP mengikuti kondisi Auto Follow.
+
+        UpdateTab4Layout();
+    }
+
+    // =========================================================
+    // TAB 4 - DYNAMIC AOB LAYOUT
+    // =========================================================
+
+    private void UpdateTab4Layout()
+    {
+        zoomFeaturePanel.Top =
+            zoomInitializeCheck.Bottom + 6;
+
+        autoFollowInitializeCheck.Top =
+            zoomFeaturePanel.Visible
+                ? zoomFeaturePanel.Bottom + 6
+                : zoomInitializeCheck.Bottom + 6;
+
+        autoFollowFeaturePanel.Top =
+            autoFollowInitializeCheck.Bottom + 6;
+
         espInitializeCheck.Top =
-            enabled
+            autoFollowFeaturePanel.Visible
                 ? autoFollowFeaturePanel.Bottom + 6
                 : autoFollowInitializeCheck.Bottom + 6;
-    
+
         espFeaturePanel.Top =
             espInitializeCheck.Bottom + 6;
+
+        purseChargerInitializeCheck.Top =
+            espFeaturePanel.Visible
+                ? espFeaturePanel.Bottom + 6
+                : espInitializeCheck.Bottom + 6;
+
+        purseChargerFeaturePanel.Top =
+            purseChargerInitializeCheck.Bottom + 6;
+
+        Control? parent = purseChargerInitializeCheck.Parent;
+
+        if (parent != null)
+        {
+            parent.PerformLayout();
+            parent.Invalidate();
+        }
     }
 
     private void ApplyAutoFollowNick()
@@ -2233,6 +2325,175 @@ public sealed class MainForm : Form
         }
     }
     
+    // =========================================================
+    // PURSE CHARGER AOB - INITIALIZE
+    // =========================================================
+
+    private void PurseChargerInitializeCheck_CheckedChanged(
+        object? sender,
+        EventArgs e)
+    {
+        if (features == null)
+        {
+            ResetCheckBox(
+                purseChargerInitializeCheck,
+                false);
+
+            return;
+        }
+
+        if (!purseChargerInitializeCheck.Checked)
+        {
+            purseChargerTimer.Stop();
+
+            ResetCheckBox(
+                purseChargerAlwaysOnCheck,
+                false);
+
+            features.ClearPurseCharger();
+
+            purseChargerFeaturePanel.Visible = false;
+            purseChargerFeaturePanel.Height = 0;
+            purseChargerAlwaysOnCheck.Enabled = false;
+            UpdateTab4Layout();
+
+            statusLabel.Text =
+                "Status: Purse Charger AOB cleared";
+
+            return;
+        }
+
+        try
+        {
+            IntPtr address =
+                features.InitializePurseChargerAob();
+
+            purseChargerFeaturePanel.Visible = true;
+            purseChargerFeaturePanel.Height = 34;
+            purseChargerAlwaysOnCheck.Enabled = true;
+            
+            UpdateTab4Layout();
+
+            statusLabel.Text =
+                $"Status: Purse Charger AOB OK → 0x{address.ToInt64():X8}";
+        }
+        catch (Exception ex)
+        {
+            purseChargerTimer.Stop();
+
+            purseChargerFeaturePanel.Visible = false;
+            purseChargerFeaturePanel.Height = 0;
+            purseChargerAlwaysOnCheck.Enabled = false;
+            
+            HandleFeatureError(
+                "Purse Charger Initialize",
+                ex);
+
+            ResetCheckBox(
+                purseChargerInitializeCheck,
+                false);
+
+            UpdateTab4Layout();
+        }
+    }
+
+    // =========================================================
+    // PURSE CHARGER - ALWAYS ON
+    // =========================================================
+
+    private void PurseChargerAlwaysOnCheck_CheckedChanged(
+        object? sender,
+        EventArgs e)
+    {
+        if (features == null ||
+            !purseChargerInitializeCheck.Checked)
+        {
+            purseChargerTimer.Stop();
+
+            if (features != null)
+                features.RestorePurseCharger();
+
+            ResetCheckBox(
+                purseChargerAlwaysOnCheck,
+                false);
+
+            return;
+        }
+
+        try
+        {
+            if (purseChargerAlwaysOnCheck.Checked)
+            {
+                features.ForcePurseChargerOn();
+
+                purseChargerTimer.Interval = 50;
+                purseChargerTimer.Start();
+
+                statusLabel.Text =
+                    "Status: Purse Charger Always On";
+            }
+            else
+            {
+                purseChargerTimer.Stop();
+
+                features.RestorePurseCharger();
+
+                statusLabel.Text =
+                    "Status: Purse Charger OFF";
+            }
+        }
+        catch (Exception ex)
+        {
+            purseChargerTimer.Stop();
+
+            features.RestorePurseCharger();
+
+            HandleFeatureError(
+                "Purse Charger Always On",
+                ex);
+
+            ResetCheckBox(
+                purseChargerAlwaysOnCheck,
+                false);
+        }
+    }
+
+    // =========================================================
+    // PURSE CHARGER - TIMER 50 MS
+    // =========================================================
+
+    private void PurseChargerTimer_Tick(
+        object? sender,
+        EventArgs e)
+    {
+        if (features == null ||
+            !purseChargerInitializeCheck.Checked ||
+            !purseChargerAlwaysOnCheck.Checked)
+        {
+            purseChargerTimer.Stop();
+            return;
+        }
+
+        try
+        {
+            features.ForcePurseChargerOn();
+        }
+        catch (Exception ex)
+        {
+            purseChargerTimer.Stop();
+
+            features.RestorePurseCharger();
+
+            HandleFeatureError(
+                "Purse Charger Timer",
+                ex);
+
+            ResetCheckBox(
+                purseChargerAlwaysOnCheck,
+                false);
+        }
+    }
+
     private CheckBox[] GetEspChecks()
     {
         return new[]
@@ -2247,13 +2508,16 @@ public sealed class MainForm : Form
             espLockSpotLootingCheck
         };
     }
-    
+   
     private void SetEspFeatureEnabled(bool enabled)
     {
         espFeaturePanel.Visible = enabled;
-    
+        espFeaturePanel.Height = enabled ? 270 : 0;
+
         foreach (var check in GetEspChecks())
             check.Enabled = enabled;
+
+        UpdateTab4Layout();
     }
     
     private void ApplyEspFeature(int offset, CheckBox check)
