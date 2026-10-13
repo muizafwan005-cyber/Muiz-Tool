@@ -1664,8 +1664,6 @@ public sealed class MainForm : Form
         espLockSpotLootingCheck = CreateIndentedCheckBox(
             espFeaturePanel, "Lock Spot Looting", espY);
         
-        // Kondisi awal
-        SetEspFeatureEnabled(false);
 
         // =========================================================
         // PURSE CHARGER AOB - INITIALIZE
