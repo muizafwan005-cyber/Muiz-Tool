@@ -1229,13 +1229,32 @@ public sealed class MainForm : Form
         // COMBINE
         // =====================================================
         
+
+        // =====================================================
+        // COMBINE
+        // =====================================================
+
         y += 48;
-        
+
+        combineInitializeCheck =
+            CreateFeatureCheckBox(
+                panel,
+                "COMBINE AOB - INITIALIZE",
+                y);
+
+        y += 34;
+
         combineCheck =
             CreateFeatureCheckBox(
                 panel,
                 "Combine Jarak Jauh",
                 y);
+
+        combineCheck.Visible = false;
+        combineCheck.Enabled = false;
+
+        y += 34;
+
 
         // =====================================================
         // EVENTS
@@ -1243,19 +1262,22 @@ public sealed class MainForm : Form
 
         autoNpcCheck.CheckedChanged +=
             AutoNpcCheck_CheckedChanged;
-        
+
         stage2Check.CheckedChanged +=
             Stage2Check_CheckedChanged;
-        
+
         stage5RomanticCheck.CheckedChanged +=
             Stage5RomanticCheck_CheckedChanged;
-        
+
         stage3TrueHeartCheck.CheckedChanged +=
             Stage3TrueHeartCheck_CheckedChanged;
-        
+
         infernalDragonboneCheck.CheckedChanged +=
             InfernalDragonboneCheck_CheckedChanged;
-        
+
+        combineInitializeCheck.CheckedChanged +=
+            CombineInitializeCheck_CheckedChanged;
+
         combineCheck.CheckedChanged +=
             CombineCheck_CheckedChanged;
     }
@@ -4813,88 +4835,99 @@ public sealed class MainForm : Form
                 false);
         }
     }
-    // =========================================================
-    // COMBINE
-    // =========================================================
 
-    private void CombineCheck_CheckedChanged(
-        object? sender,
-        EventArgs e)
-    {
-        if (features == null)
+        // =========================================================
+        // COMBINE
+        // =========================================================
+    
+        private void CombineCheck_CheckedChanged(
+            object? sender,
+            EventArgs e)
         {
-            ResetCheckBox(
-                combineCheck,
-                false);
-
-            return;
+            if (features == null ||
+                !combineInitializeCheck.Checked)
+            {
+                ResetCheckBox(
+                    combineCheck,
+                    false);
+    
+                return;
+            }
+    
+            try
+            {
+                bool enabled =
+                    combineCheck.Checked;
+    
+                features.Combine(enabled);
+    
+                statusLabel.Text =
+                    enabled
+                        ? "Status: Combine Jarak Jauh ON"
+                        : "Status: Combine Jarak Jauh OFF";
+            }
+            catch (Exception ex)
+            {
+                HandleFeatureError(
+                    "Combine Jarak Jauh",
+                    ex);
+    
+                ResetCheckBox(
+                    combineCheck,
+                    false);
+            }
         }
 
-        try
+
+
+        // =========================================================
+        // SET TAB 2 CHECKBOXES
+        // =========================================================
+    
+        private void SetTab2Checks(
+            bool value)
         {
-            bool enabled =
-                combineCheck.Checked;
-
-            features.Combine(
-                enabled);
-
-            statusLabel.Text =
-                enabled
-                    ? "Status: Combine Jarak Jauh ON"
-                    : "Status: Combine Jarak Jauh OFF";
+            if (autoNpcCheck != null)
+            {
+                ResetCheckBox(
+                    autoNpcCheck,
+                    value);
+            }
+    
+            if (stage2Check != null)
+            {
+                ResetCheckBox(
+                    stage2Check,
+                    value);
+            }
+    
+            if (combineInitializeCheck != null)
+            {
+                ResetCheckBox(
+                    combineInitializeCheck,
+                    false);
+            }
+    
+            if (combineCheck != null)
+            {
+                ResetCheckBox(
+                    combineCheck,
+                    false);
+    
+                combineCheck.Visible = false;
+                combineCheck.Enabled = false;
+            }
+    
+            SetNpcTargetControlsEnabled(
+                value &&
+                autoNpcCheck != null &&
+                autoNpcCheck.Checked);
+    
+            if (!value)
+            {
+                ResetNpcAddressLabels();
+            }
         }
-        catch (Exception ex)
-        {
-            HandleFeatureError(
-                "Combine Jarak Jauh",
-                ex);
-
-            ResetCheckBox(
-                combineCheck,
-                false);
-        }
-    }
-
-
-    // =========================================================
-    // SET TAB 2 CHECKBOXES
-    // =========================================================
-
-    private void SetTab2Checks(
-        bool value)
-    {
-        if (autoNpcCheck != null)
-        {
-            ResetCheckBox(
-                autoNpcCheck,
-                value);
-        }
-
-        if (stage2Check != null)
-        {
-            ResetCheckBox(
-                stage2Check,
-                value);
-        }
-
-        if (combineCheck != null)
-        {
-            ResetCheckBox(
-                combineCheck,
-                value);
-        }
-
-        SetNpcTargetControlsEnabled(
-            value &&
-            autoNpcCheck != null &&
-            autoNpcCheck.Checked);
-
-        if (!value)
-        {
-            ResetNpcAddressLabels();
-        }
-    }
-
 
     // =========================================================
     // ATTACHED CHECK
