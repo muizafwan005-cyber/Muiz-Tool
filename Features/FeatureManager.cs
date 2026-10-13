@@ -425,14 +425,13 @@ public sealed class FeatureManager
             readBack);
     }
 
-
-
         // =========================================================
         // COMBINE
         // =========================================================
     
         public IntPtr InitializeCombineAob()
         {
+            // Reset alamat sebelumnya sebelum scan ulang.
             combineBase = IntPtr.Zero;
     
             var hits =
@@ -445,19 +444,31 @@ public sealed class FeatureManager
                     $"COMBINE AOB: signature tidak unik = {hits.Count}");
             }
     
-            combineBase =
+            // AOB ditemukan 4 byte setelah base.
+            IntPtr candidate =
                 new IntPtr(
                     hits[0].ToInt64() - 4);
     
-            try
+            // Validasi marker pada Base + 0x04.
+            byte[] marker =
+                memory.ReadBytes(
+                    new IntPtr(candidate.ToInt64() + 4),
+                    4);
+    
+            if (!marker.SequenceEqual(
+                new byte[]
+                {
+                    0x00,
+                    0x00,
+                    0xFB,
+                    0x1C
+                }))
             {
-                memory.ReadBytes(combineBase, 1);
+                throw new InvalidOperationException(
+                    "COMBINE AOB: marker tidak valid.");
             }
-            catch
-            {
-                combineBase = IntPtr.Zero;
-                throw;
-            }
+    
+            combineBase = candidate;
     
             return combineBase;
         }
@@ -478,6 +489,7 @@ public sealed class FeatureManager
                     enabled ? (byte)1 : (byte)0);
             }
         }
+
 
 
     // =========================================================
