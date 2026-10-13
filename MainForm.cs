@@ -51,7 +51,8 @@ public sealed class MainForm : Form
     private CheckBox stage3TrueHeartCheck = null!;
     private CheckBox infernalDragonboneCheck = null!;
     private CheckBox combineCheck = null!;
-
+    private CheckBox combineInitializeCheck = null!;
+    
     // =========================================================
     // TAB 4 - ZOOM / AUTO FOLLOW
     // =========================================================
@@ -4836,10 +4837,11 @@ public sealed class MainForm : Form
         }
     }
 
+
         // =========================================================
         // COMBINE
         // =========================================================
-    
+
         private void CombineCheck_CheckedChanged(
             object? sender,
             EventArgs e)
@@ -4850,17 +4852,16 @@ public sealed class MainForm : Form
                 ResetCheckBox(
                     combineCheck,
                     false);
-    
+
                 return;
             }
-    
+
             try
             {
-                bool enabled =
-                    combineCheck.Checked;
-    
+                bool enabled = combineCheck.Checked;
+
                 features.Combine(enabled);
-    
+
                 statusLabel.Text =
                     enabled
                         ? "Status: Combine Jarak Jauh ON"
@@ -4871,14 +4872,70 @@ public sealed class MainForm : Form
                 HandleFeatureError(
                     "Combine Jarak Jauh",
                     ex);
-    
+
                 ResetCheckBox(
                     combineCheck,
                     false);
             }
         }
 
+        // =========================================================
+        // COMBINE AOB - INITIALIZE
+        // =========================================================
 
+        private void CombineInitializeCheck_CheckedChanged(
+            object? sender,
+            EventArgs e)
+        {
+            if (features == null)
+            {
+                ResetCheckBox(
+                    combineInitializeCheck,
+                    false);
+
+                return;
+            }
+
+            if (!combineInitializeCheck.Checked)
+            {
+                ResetCheckBox(
+                    combineCheck,
+                    false);
+
+                combineCheck.Visible = false;
+                combineCheck.Enabled = false;
+
+                statusLabel.Text =
+                    "Status: Combine Initialize OFF";
+
+                return;
+            }
+
+            try
+            {
+                IntPtr address =
+                    features.InitializeCombineAob();
+
+                combineCheck.Visible = true;
+                combineCheck.Enabled = true;
+
+                statusLabel.Text =
+                    $"Status: Combine AOB OK → 0x{address.ToInt64():X8}";
+            }
+            catch (Exception ex)
+            {
+                combineCheck.Visible = false;
+                combineCheck.Enabled = false;
+
+                HandleFeatureError(
+                    "COMBINE AOB - INITIALIZE",
+                    ex);
+
+                ResetCheckBox(
+                    combineInitializeCheck,
+                    false);
+            }
+        }
 
         // =========================================================
         // SET TAB 2 CHECKBOXES
