@@ -1854,46 +1854,6 @@ public sealed class MainForm : Form
         UpdateTab4Layout();
     }
     
-        // =========================================================
-        // ZOOM PANEL HEIGHT
-        // =========================================================
-    
-        if (enabled)
-        {
-            zoomFeaturePanel.Height = 390;
-        }
-        else
-        {
-            zoomFeaturePanel.Height = 0;
-        }
-    
-        // =========================================================
-        // AUTO FOLLOW HEADER POSITION
-        // =========================================================
-    
-        autoFollowInitializeCheck.Top =
-            zoomFeaturePanel.Bottom + 6;
-    
-
-        // =========================================================
-        // AUTO FOLLOW CONTENT POSITION
-        // =========================================================
-
-        autoFollowFeaturePanel.Top =
-            autoFollowInitializeCheck.Bottom + 6;
-
-        // =========================================================
-        // ESP HEADER DAN PANEL POSITION
-        // =========================================================
-
-        espInitializeCheck.Top =
-            autoFollowFeaturePanel.Visible
-                ? autoFollowFeaturePanel.Bottom + 6
-                : autoFollowInitializeCheck.Bottom + 6;
-        
-        espFeaturePanel.Top =
-            espInitializeCheck.Bottom + 6;
-    }
 
     private void SetReviveSelection(
         CheckBox selected)
