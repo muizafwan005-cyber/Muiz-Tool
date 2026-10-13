@@ -56,6 +56,7 @@ public sealed class FeatureManager
 
     private IntPtr autoFollowAddress = IntPtr.Zero;
     private IntPtr autoFollowNickAddress = IntPtr.Zero;
+    private IntPtr espAddress = IntPtr.Zero;
 
 
     // =========================================================
@@ -1636,6 +1637,7 @@ public sealed class FeatureManager
     }
 
 
+
     // =========================================================
     // RESET AOB CACHE
     // =========================================================
@@ -1671,8 +1673,66 @@ public sealed class FeatureManager
 
         autoFollowNickAddress =
             IntPtr.Zero;
+
+        espAddress =
+            IntPtr.Zero;
     }
 
+
+    // =========================================================
+    // ESP AOB - INITIALIZE
+    // =========================================================
+
+    public IntPtr InitializeEspAob()
+    {
+        const string pattern =
+            "00 00 00 00 00 00 00 00 00 00 FF FF 00 00 FF FF 00 00 FF FF";
+
+        var hits = scanner.ScanProcess(pattern);
+
+        if (hits.Count != 1)
+        {
+            throw new InvalidOperationException(
+                $"ESP AOB: signature tidak unik = {hits.Count}");
+        }
+
+        espAddress = hits[0];
+        return espAddress;
+    }
+
+    // =========================================================
+    // ESP - SET FEATURE
+    // Offset 0 sampai 7
+    // =========================================================
+
+    public void SetEspFeature(int offset, bool enabled)
+    {
+        if (offset < 0 || offset > 7)
+        {
+            throw new ArgumentOutOfRangeException(nameof(offset));
+        }
+
+        if (espAddress == IntPtr.Zero)
+        {
+            InitializeEspAob();
+        }
+
+        IntPtr address = new IntPtr(
+            espAddress.ToInt64() + offset);
+
+        memory.WriteByte(
+            address,
+            enabled ? (byte)1 : (byte)0);
+    }
+
+    // =========================================================
+    // ESP - CLEAR ADDRESS
+    // =========================================================
+
+    public void ClearEsp()
+    {
+        espAddress = IntPtr.Zero;
+    }
 
     // =========================================================
     // RESTORE ALL
