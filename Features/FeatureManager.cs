@@ -426,76 +426,58 @@ public sealed class FeatureManager
     }
 
 
-    // =========================================================
-    // COMBINE
-    // =========================================================
 
-    public void Combine(
-        bool enabled)
-    {
-        EnsureCombineBase();
-
-        foreach (int offset in CombineOffsets)
+        // =========================================================
+        // COMBINE
+        // =========================================================
+    
+        public IntPtr InitializeCombineAob()
         {
-            memory.WriteByte(
+            combineBase = IntPtr.Zero;
+    
+            var hits =
+                scanner.ScanWritable(
+                    "00 00 00 00 1C FB 00 00");
+    
+            if (hits.Count != 1)
+            {
+                throw new InvalidOperationException(
+                    $"COMBINE AOB: signature tidak unik = {hits.Count}");
+            }
+    
+            combineBase =
                 new IntPtr(
-                    combineBase.ToInt64() +
-                    offset),
-                enabled
-                    ? (byte)1
-                    : (byte)0);
-        }
-    }
-
-
-    private void EnsureCombineBase()
-    {
-        if (combineBase != IntPtr.Zero)
-        {
+                    hits[0].ToInt64() - 4);
+    
             try
             {
-                var check =
-                    memory.ReadBytes(
-                        new IntPtr(
-                            combineBase.ToInt64() +
-                            4),
-                        4);
-
-                if (check.SequenceEqual(
-                    new byte[]
-                    {
-                        0x00,
-                        0x00,
-                        0xFB,
-                        0x1C
-                    }))
-                {
-                    return;
-                }
+                memory.ReadBytes(combineBase, 1);
             }
             catch
             {
+                combineBase = IntPtr.Zero;
+                throw;
             }
-
-            combineBase =
-                IntPtr.Zero;
+    
+            return combineBase;
         }
-
-        var hits =
-            scanner.ScanWritable(
-                "00 00 00 00 1C FB 00 00");
-
-        if (hits.Count != 1)
+    
+        public void Combine(bool enabled)
         {
-            throw new InvalidOperationException(
-                $"COMBINE: signature tidak unik = {hits.Count}");
+            if (combineBase == IntPtr.Zero)
+            {
+                throw new InvalidOperationException(
+                    "COMBINE belum di-initialize.");
+            }
+    
+            foreach (int offset in CombineOffsets)
+            {
+                memory.WriteByte(
+                    new IntPtr(
+                        combineBase.ToInt64() + offset),
+                    enabled ? (byte)1 : (byte)0);
+            }
         }
-
-        combineBase =
-            new IntPtr(
-                hits[0].ToInt64() -
-                4);
-    }
 
 
     // =========================================================
