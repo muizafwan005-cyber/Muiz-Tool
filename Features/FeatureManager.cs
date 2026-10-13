@@ -57,7 +57,13 @@ public sealed class FeatureManager
     private IntPtr autoFollowAddress = IntPtr.Zero;
     private IntPtr autoFollowNickAddress = IntPtr.Zero;
     private IntPtr espAddress = IntPtr.Zero;
-
+    
+    // =========================================================
+    // PURSE CHARGER AOB
+    // =========================================================
+    
+    private IntPtr purseChargerAddress = IntPtr.Zero;
+    private byte? purseChargeOriginal = null;
 
     // =========================================================
     // NPC COMMANDS
@@ -1672,7 +1678,133 @@ public sealed class FeatureManager
             IntPtr.Zero;
     }
 
+    // =========================================================
+    // PURSE CHARGER AOB - INITIALIZE
+    // =========================================================
 
+    public IntPtr InitializePurseChargerAob()
+    {
+        purseChargerAddress = IntPtr.Zero;
+        purseChargeOriginal = null;
+
+        const string pattern =
+            "FF 55 55 55 00 00 00 00";
+
+        var hits =
+            scanner.ScanProcess(pattern);
+
+        IntPtr foundAddress = IntPtr.Zero;
+        int validCount = 0;
+
+        foreach (var hit in hits)
+        {
+            long candidate = hit.ToInt64();
+
+            try
+            {
+                // Base + 0x2C harus berisi B7 84 41 00.
+                byte[] marker =
+                    memory.ReadBytes(
+                        new IntPtr(candidate + 0x2C),
+                        4);
+
+                // Base + 0x30 harus berisi 55.
+                byte marker30 =
+                    memory.ReadByte(
+                        new IntPtr(candidate + 0x30));
+
+                if (!marker.SequenceEqual(
+                    new byte[]
+                    {
+                        0xB7,
+                        0x84,
+                        0x41,
+                        0x00
+                    }))
+                {
+                    continue;
+                }
+
+                if (marker30 != 0x55)
+                    continue;
+
+                // Target Purse Charger = Base + 0x08.
+                IntPtr target =
+                    new IntPtr(candidate + 0x08);
+
+                // Pastikan target dapat dibaca.
+                memory.ReadBytes(target, 1);
+
+                foundAddress = target;
+                validCount++;
+            }
+            catch
+            {
+                // Kandidat tidak valid atau tidak dapat dibaca.
+            }
+        }
+
+        if (validCount != 1)
+        {
+            throw new InvalidOperationException(
+                $"PURSE CHARGER AOB: kandidat valid = {validCount}");
+        }
+
+        purseChargerAddress = foundAddress;
+
+        return purseChargerAddress;
+    }
+
+    // =========================================================
+    // PURSE CHARGER - FORCE ON
+    // =========================================================
+
+    public void ForcePurseChargerOn()
+    {
+        if (purseChargerAddress == IntPtr.Zero)
+        {
+            throw new InvalidOperationException(
+                "Purse Charger belum di-initialize.");
+        }
+
+        if (purseChargeOriginal == null)
+        {
+            purseChargeOriginal =
+                memory.ReadByte(
+                    purseChargerAddress);
+        }
+
+        memory.WriteByte(
+            purseChargerAddress,
+            0x01);
+    }
+
+    // =========================================================
+    // PURSE CHARGER - RESTORE ORIGINAL
+    // =========================================================
+
+    public void RestorePurseCharger()
+    {
+        if (purseChargerAddress != IntPtr.Zero &&
+            purseChargeOriginal.HasValue)
+        {
+            memory.WriteByte(
+                purseChargerAddress,
+                purseChargeOriginal.Value);
+        }
+
+        purseChargeOriginal = null;
+    }
+
+    // =========================================================
+    // PURSE CHARGER - CLEAR ADDRESS
+    // =========================================================
+
+    public void ClearPurseCharger()
+    {
+        RestorePurseCharger();
+        purseChargerAddress = IntPtr.Zero;
+    }
 
     // =========================================================
     // ESP AOB - INITIALIZE
