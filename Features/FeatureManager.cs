@@ -455,12 +455,13 @@ public sealed class FeatureManager
                 new IntPtr(
                     hits[0].ToInt64() - 4);
     
+
             // Validasi marker pada Base + 0x04.
             byte[] marker =
                 memory.ReadBytes(
                     new IntPtr(candidate.ToInt64() + 4),
                     4);
-    
+
             if (!marker.SequenceEqual(
                 new byte[]
                 {
@@ -470,8 +471,16 @@ public sealed class FeatureManager
                     0x1C
                 }))
             {
+                string actualMarker =
+                    string.Join(
+                        " ",
+                        marker.Select(
+                            b => b.ToString("X2")));
+
                 throw new InvalidOperationException(
-                    "COMBINE AOB: marker tidak valid.");
+                    $"COMBINE marker tidak valid. " +
+                    $"Candidate=0x{candidate.ToInt64():X8}; " +
+                    $"Marker aktual={actualMarker}");
             }
     
             combineBase = candidate;
