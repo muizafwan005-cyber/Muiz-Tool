@@ -1788,15 +1788,17 @@ public sealed class MainForm : Form
         // AUTO FOLLOW CONTENT POSITION
         // =========================================================
     
+
         autoFollowFeaturePanel.Top =
             autoFollowInitializeCheck.Bottom + 6;
-    }
-        // ESP header dan panel mengikuti posisi Auto Follow
+
+        // ESP header dan panel
         espInitializeCheck.Top =
             autoFollowFeaturePanel.Bottom + 6;
-        
+
         espFeaturePanel.Top =
             espInitializeCheck.Bottom + 6;
+    }
             
     private void SetReviveSelection(
         CheckBox selected)
