@@ -1679,14 +1679,16 @@ public sealed class FeatureManager
     }
 
 
+
     // =========================================================
     // ESP AOB - INITIALIZE
+    // Signature: 88 28 2E ?? 04
+    // Header = hasil scan
+    // Base   = Header - 0x0B
     // =========================================================
-
     public IntPtr InitializeEspAob()
     {
-        const string pattern =
-            "00 00 00 00 00 00 00 00 00 00 FF FF 00 00 FF FF 00 00 FF FF";
+        const string pattern = "88 28 2E ?? 04";
 
         var hits = scanner.ScanProcess(pattern);
 
@@ -1696,15 +1698,21 @@ public sealed class FeatureManager
                 $"ESP AOB: signature tidak unik = {hits.Count}");
         }
 
-        espAddress = hits[0];
+        long header = hits[0].ToInt64();
+        long baseAddress = header - 0x0B;
+
+        // Pastikan seluruh 8 byte fitur dapat dibaca.
+        IntPtr featureStart = new IntPtr(baseAddress + 0x10);
+        memory.ReadBytes(featureStart, 8);
+
+        espAddress = new IntPtr(baseAddress);
         return espAddress;
     }
 
     // =========================================================
     // ESP - SET FEATURE
-    // Offset 0 sampai 7
+    // Logical index 0..7 dipetakan ke Base + 0x10..0x17
     // =========================================================
-
     public void SetEspFeature(int offset, bool enabled)
     {
         if (offset < 0 || offset > 7)
@@ -1718,12 +1726,13 @@ public sealed class FeatureManager
         }
 
         IntPtr address = new IntPtr(
-            espAddress.ToInt64() + offset);
+            espAddress.ToInt64() + 0x10 + offset);
 
         memory.WriteByte(
             address,
             enabled ? (byte)1 : (byte)0);
     }
+
 
     // =========================================================
     // ESP - CLEAR ADDRESS
