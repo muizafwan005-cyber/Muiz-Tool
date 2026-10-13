@@ -76,7 +76,20 @@ public sealed class MainForm : Form
     private CheckBox autoFollowEnabledCheck = null!;
     private Panel zoomFeaturePanel = null!;
     private Panel autoFollowFeaturePanel = null!;
+    // =========================================================
+    // TAB 4 - ESP
+    // =========================================================
     
+    private CheckBox espInitializeCheck = null!;
+    private CheckBox espLineCheck = null!;
+    private CheckBox espNameCheck = null!;
+    private CheckBox espDistanceCheck = null!;
+    private CheckBox espAllyCheck = null!;
+    private CheckBox espEnemyCheck = null!;
+    private CheckBox espMonsterCheck = null!;
+    private CheckBox espLockBotCheck = null!;
+    private CheckBox espLockSpotLootingCheck = null!;
+    private Panel espFeaturePanel = null!;
     private System.Windows.Forms.Timer freezeTimer = null!;
 
     private readonly List<FreezeEntry> freezeEntries = new();
@@ -1560,7 +1573,67 @@ public sealed class MainForm : Form
                 autoFollowFeaturePanel,
                 "Auto Follow",
                 autoFollowY);
-    
+        // =========================================================
+        // ESP INITIALIZE
+        // =========================================================
+        
+        espInitializeCheck =
+            CreateFeatureCheckBox(
+                panel,
+                "ESP AOB - INITIALIZE",
+                autoFollowFeaturePanel.Bottom + 6);
+        
+        // =========================================================
+        // ESP FEATURE PANEL
+        // =========================================================
+        
+        espFeaturePanel = new Panel
+        {
+            Location = new Point(
+                0,
+                espInitializeCheck.Bottom + 6),
+            Size = new Size(300, 270),
+            BackColor = BackColorMain,
+            Visible = false
+        };
+        
+        panel.Controls.Add(espFeaturePanel);
+        
+        int espY = 0;
+        
+        espLineCheck = CreateIndentedCheckBox(
+            espFeaturePanel, "Line", espY);
+        espY += 30;
+        
+        espNameCheck = CreateIndentedCheckBox(
+            espFeaturePanel, "Name", espY);
+        espY += 30;
+        
+        espDistanceCheck = CreateIndentedCheckBox(
+            espFeaturePanel, "Distance", espY);
+        espY += 30;
+        
+        espAllyCheck = CreateIndentedCheckBox(
+            espFeaturePanel, "Ally", espY);
+        espY += 30;
+        
+        espEnemyCheck = CreateIndentedCheckBox(
+            espFeaturePanel, "Enemy", espY);
+        espY += 30;
+        
+        espMonsterCheck = CreateIndentedCheckBox(
+            espFeaturePanel, "Monster", espY);
+        espY += 30;
+        
+        espLockBotCheck = CreateIndentedCheckBox(
+            espFeaturePanel, "Lock Bot", espY);
+        espY += 30;
+        
+        espLockSpotLootingCheck = CreateIndentedCheckBox(
+            espFeaturePanel, "Lock Spot Looting", espY);
+        
+        // Kondisi awal
+        SetEspFeatureEnabled(false);
         // =========================================================
         // DEFAULT STATE
         // =========================================================
@@ -1617,7 +1690,34 @@ public sealed class MainForm : Form
     
         autoFollowEnabledCheck.CheckedChanged +=
             AutoFollowEnabledCheck_CheckedChanged;
-    
+
+        espInitializeCheck.CheckedChanged +=
+            EspInitializeCheck_CheckedChanged;
+        
+        espLineCheck.CheckedChanged +=
+            (_, _) => ApplyEspFeature(0, espLineCheck);
+        
+        espNameCheck.CheckedChanged +=
+            (_, _) => ApplyEspFeature(1, espNameCheck);
+        
+        espDistanceCheck.CheckedChanged +=
+            (_, _) => ApplyEspFeature(2, espDistanceCheck);
+        
+        espAllyCheck.CheckedChanged +=
+            (_, _) => ApplyEspFeature(3, espAllyCheck);
+        
+        espEnemyCheck.CheckedChanged +=
+            (_, _) => ApplyEspFeature(4, espEnemyCheck);
+        
+        espMonsterCheck.CheckedChanged +=
+            (_, _) => ApplyEspFeature(5, espMonsterCheck);
+        
+        espLockBotCheck.CheckedChanged +=
+            (_, _) => ApplyEspFeature(6, espLockBotCheck);
+        
+        espLockSpotLootingCheck.CheckedChanged +=
+            (_, _) => ApplyEspFeature(7, espLockSpotLootingCheck);
+
         // =========================================================
         // INITIAL STATE
         // =========================================================
@@ -1691,7 +1791,13 @@ public sealed class MainForm : Form
         autoFollowFeaturePanel.Top =
             autoFollowInitializeCheck.Bottom + 6;
     }
-
+        // ESP header dan panel mengikuti posisi Auto Follow
+        espInitializeCheck.Top =
+            autoFollowFeaturePanel.Bottom + 6;
+        
+        espFeaturePanel.Top =
+            espInitializeCheck.Bottom + 6;
+            
     private void SetReviveSelection(
         CheckBox selected)
     {
@@ -2035,7 +2141,86 @@ public sealed class MainForm : Form
             ResetCheckBox(autoFollowEnabledCheck, false);
         }
     }
-
+    // =========================================================
+    // ESP INITIALIZE
+    // =========================================================
+    
+    private void EspInitializeCheck_CheckedChanged(
+        object? sender,
+        EventArgs e)
+    {
+        if (features == null)
+        {
+            ResetCheckBox(espInitializeCheck, false);
+            SetEspFeatureEnabled(false);
+            return;
+        }
+    
+        try
+        {
+            if (espInitializeCheck.Checked)
+            {
+                features.InitializeEspAob();
+                SetEspFeatureEnabled(true);
+                statusLabel.Text = "Status: ESP AOB initialized";
+            }
+            else
+            {
+                foreach (var check in GetEspChecks())
+                    ResetCheckBox(check, false);
+    
+                features.ClearEsp();
+                SetEspFeatureEnabled(false);
+                statusLabel.Text = "Status: ESP AOB cleared";
+            }
+        }
+        catch (Exception ex)
+        {
+            HandleFeatureError("ESP Initialize", ex);
+            ResetCheckBox(espInitializeCheck, false);
+            SetEspFeatureEnabled(false);
+        }
+    }
+    
+    private CheckBox[] GetEspChecks()
+    {
+        return new[]
+        {
+            espLineCheck,
+            espNameCheck,
+            espDistanceCheck,
+            espAllyCheck,
+            espEnemyCheck,
+            espMonsterCheck,
+            espLockBotCheck,
+            espLockSpotLootingCheck
+        };
+    }
+    
+    private void SetEspFeatureEnabled(bool enabled)
+    {
+        espFeaturePanel.Visible = enabled;
+    
+        foreach (var check in GetEspChecks())
+            check.Enabled = enabled;
+    }
+    
+    private void ApplyEspFeature(int offset, CheckBox check)
+    {
+        if (!espInitializeCheck.Checked || features == null)
+            return;
+    
+        try
+        {
+            features.SetEspFeature(offset, check.Checked);
+            statusLabel.Text = $"Status: ESP {check.Text} {(check.Checked ? "ON" : "OFF")}";
+        }
+        catch (Exception ex)
+        {
+            HandleFeatureError("ESP " + check.Text, ex);
+            ResetCheckBox(check, false);
+        }
+    }
 
     // =========================================================
     // TAB 3
