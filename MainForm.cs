@@ -1581,7 +1581,7 @@ public sealed class MainForm : Form
             CreateFeatureCheckBox(
                 panel,
                 "ESP AOB - INITIALIZE",
-                autoFollowFeaturePanel.Bottom + 6);
+                autoFollowInitializeCheck.Bottom + 6);
         
         // =========================================================
         // ESP FEATURE PANEL
@@ -1797,8 +1797,10 @@ public sealed class MainForm : Form
         // =========================================================
 
         espInitializeCheck.Top =
-            autoFollowFeaturePanel.Bottom + 6;
-
+            autoFollowFeaturePanel.Visible
+                ? autoFollowFeaturePanel.Bottom + 6
+                : autoFollowInitializeCheck.Bottom + 6;
+        
         espFeaturePanel.Top =
             espInitializeCheck.Bottom + 6;
     }
@@ -2094,13 +2096,24 @@ public sealed class MainForm : Form
         }
     }
 
+
     private void SetAutoFollowFeatureEnabled(bool enabled)
     {
         autoFollowFeaturePanel.Visible = enabled;
+        autoFollowFeaturePanel.Height = enabled ? 68 : 0;
     
         autoFollowNickTextBox.Enabled = enabled;
         autoFollowNickButton.Enabled = enabled;
         autoFollowEnabledCheck.Enabled = enabled;
+    
+        // Pindahkan ESP mengikuti kondisi Auto Follow.
+        espInitializeCheck.Top =
+            enabled
+                ? autoFollowFeaturePanel.Bottom + 6
+                : autoFollowInitializeCheck.Bottom + 6;
+    
+        espFeaturePanel.Top =
+            espInitializeCheck.Bottom + 6;
     }
 
     private void ApplyAutoFollowNick()
