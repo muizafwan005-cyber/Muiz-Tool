@@ -997,27 +997,11 @@ public sealed class FeatureManager
             value);
     }
 
-
     // =========================================================
     // ZOOM AOB
+    // Signature dari Cheat Engine yang terbukti berhasil
     // =========================================================
-    //
-    // Signature:
-    //
-    // 90 27 ?? 04 00 ?? 00 00 00 00 00 00
-    //
-    // Relative:
-    //
-    // +05 = Zoom
-    // +06 = MAU Keyboard
-    // +08 = Revive
-    // +0A = Auto Pick
-    // +0B = Lock Spot
-    // +0C = Show Name
-    // +0D = Fast Loot
-    // +28 = Distance
-    // =========================================================
-
+    
     public (
         IntPtr Zoom,
         IntPtr MauKeyboard,
@@ -1030,61 +1014,42 @@ public sealed class FeatureManager
         InitializeZoomAob()
     {
         const string pattern =
-            "90 27 ?? 04 00 ?? 00 00 00 00 00 00";
-
-        var hits =
-            scanner.ScanProcess(
-                pattern);
-
+            "?? ?? ?? ?? ?? 00 00 00 ?? ?? ?? ?? 00 ?? 00 88 50 3F ?? 04";
+    
+        var hits = scanner.ScanProcess(pattern);
+    
         if (hits.Count != 1)
         {
             throw new InvalidOperationException(
                 $"ZOOM AOB: signature tidak unik = {hits.Count}");
         }
-
-        IntPtr baseAddress =
-            hits[0];
-
+    
+        long aob = hits[0].ToInt64();
+    
         zoomAddress =
-            new IntPtr(
-                baseAddress.ToInt64() +
-                0x05);
-
+            new IntPtr(aob + 0x15);
+    
         mauKeyboardAddress =
-            new IntPtr(
-                baseAddress.ToInt64() +
-                0x06);
-
+            new IntPtr(aob + 0x16);
+    
         reviveAddress =
-            new IntPtr(
-                baseAddress.ToInt64() +
-                0x08);
-
+            new IntPtr(aob + 0x18);
+    
         autoPickAddress =
-            new IntPtr(
-                baseAddress.ToInt64() +
-                0x0A);
-
+            new IntPtr(aob + 0x1A);
+    
         lockSpotAddress =
-            new IntPtr(
-                baseAddress.ToInt64() +
-                0x0B);
-
+            new IntPtr(aob + 0x1B);
+    
         showNameAddress =
-            new IntPtr(
-                baseAddress.ToInt64() +
-                0x0C);
-
+            new IntPtr(aob + 0x1C);
+    
         fastLootAddress =
-            new IntPtr(
-                baseAddress.ToInt64() +
-                0x0D);
-
+            new IntPtr(aob + 0x1D);
+    
         distanceAddress =
-            new IntPtr(
-                baseAddress.ToInt64() +
-                0x28);
-
+            new IntPtr(aob + 0x38);
+    
         return (
             zoomAddress,
             mauKeyboardAddress,
@@ -1095,7 +1060,6 @@ public sealed class FeatureManager
             fastLootAddress,
             distanceAddress);
     }
-
 
     // =========================================================
     // TAB 4 - ZOOM INITIALIZE
@@ -1437,122 +1401,83 @@ public sealed class FeatureManager
             value);
     }
 
-
     // =========================================================
     // AUTO FOLLOW AOB
-    // =========================================================
-    //
-    // Signature:
-    //
-    // 00 28 00 88
-    //
-    // Validation:
-    //
-    // base + 0x1A = 00 08 70 27
-    //
-    // AutoFollow     = base + 0x38
+    // Signature dari Cheat Engine yang aktif
+    // AutoFollow     = base + 0x20
     // AutoFollowNick = AutoFollow + 0x1F4
     // =========================================================
-
+    
     public (
         IntPtr AutoFollow,
         IntPtr AutoFollowNick)
         InitializeAutoFollowAob()
     {
         const string pattern =
-            "00 28 00 88";
-
+            "?? ?? 00 08 30 3F ?? 04";
+    
         var hits =
-            scanner.ScanProcess(
-                pattern);
-
+            scanner.ScanProcess(pattern);
+    
         if (hits.Count == 0)
         {
             throw new InvalidOperationException(
                 "AUTO FOLLOW AOB: signature tidak ditemukan.");
         }
-
+    
         IntPtr found =
             IntPtr.Zero;
-
+    
         int count =
             0;
-
+    
         foreach (var baseAddress in hits)
         {
             try
             {
-                var marker =
-                    memory.ReadBytes(
-                        new IntPtr(
-                            baseAddress.ToInt64() +
-                            0x1A),
-                        4);
-
-                if (
-                    marker[0] != 0x00 ||
-                    marker[1] != 0x08 ||
-                    marker[2] != 0x70 ||
-                    marker[3] != 0x27)
-                {
-                    continue;
-                }
-
                 IntPtr autoFollow =
                     new IntPtr(
-                        baseAddress.ToInt64() +
-                        0x38);
-
+                        baseAddress.ToInt64() + 0x20);
+    
                 byte value =
-                    memory.ReadByte(
-                        autoFollow);
-
-                if (
-                    value != 0x00 &&
-                    value != 0x01)
-                {
+                    memory.ReadByte(autoFollow);
+    
+                if (value != 0x00 && value != 0x01)
                     continue;
-                }
-
-                found =
-                    autoFollow;
-
+    
+                found = autoFollow;
                 count++;
             }
             catch
             {
+                // Abaikan kandidat yang tidak dapat dibaca.
             }
         }
-
+    
         if (count != 1)
         {
             throw new InvalidOperationException(
                 $"AUTO FOLLOW AOB: candidate valid = {count}");
         }
-
-        autoFollowAddress =
-            found;
-
+    
+        autoFollowAddress = found;
+    
         autoFollowNickAddress =
-            new IntPtr(
-                found.ToInt64() +
-                0x1F4);
-
+            new IntPtr(found.ToInt64() + 0x1F4);
+    
         return (
             autoFollowAddress,
             autoFollowNickAddress);
     }
-
-
+    
     // =========================================================
     // TAB 4 - AUTO FOLLOW INITIALIZE
     // =========================================================
-
+    
     public void InitializeAutoFollow()
     {
         InitializeAutoFollowAob();
     }
-
 
     // =========================================================
     // TAB 4 - CLEAR AUTO FOLLOW
