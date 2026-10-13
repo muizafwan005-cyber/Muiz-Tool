@@ -91,6 +91,15 @@ public sealed class MainForm : Form
     private CheckBox espLockBotCheck = null!;
     private CheckBox espLockSpotLootingCheck = null!;
     private Panel espFeaturePanel = null!;
+    
+    // =========================================================
+    // TAB 4 - PURSE CHARGER
+    // =========================================================
+
+    private CheckBox purseChargerInitializeCheck = null!;
+    private CheckBox purseChargerAlwaysOnCheck = null!;
+    private Panel purseChargerFeaturePanel = null!;
+    private System.Windows.Forms.Timer purseChargerTimer = null!;
     private System.Windows.Forms.Timer freezeTimer = null!;
 
     private readonly List<FreezeEntry> freezeEntries = new();
