@@ -1105,14 +1105,13 @@ public sealed class MainForm : Form
     {
         var panel = new Panel
         {
-            Dock =
-                DockStyle.Fill,
-
-            BackColor =
-                BackColorMain,
-
-            Padding =
-                new Padding(12)
+            Dock = DockStyle.Fill,
+        
+            BackColor = BackColorMain,
+        
+            Padding = new Padding(12),
+        
+            AutoScroll = true
         };
 
         tab.Controls.Add(
@@ -1328,12 +1327,7 @@ public sealed class MainForm : Form
                 panel,
                 "Infernal Dragonbone Flame Launcher",
                 y);
-        
-        
-        // =====================================================
-        // COMBINE
-        // =====================================================
-        
+                
 
         // =====================================================
         // COMBINE
