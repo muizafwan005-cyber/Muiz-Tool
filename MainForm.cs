@@ -14,6 +14,8 @@ namespace RFTool;
 
 public sealed class MainForm : Form
 {
+    private TextBox basePointerTextBox = null!;
+    private Button basePointerApplyButton = null!;
     private const int FormWidth = 330;
     private const int FormHeight = 600;
 
@@ -503,7 +505,7 @@ public sealed class MainForm : Form
                 DockStyle.Top,
 
             Height =
-                78,
+                124,
 
             BackColor =
                 BackColorPanel
@@ -630,31 +632,53 @@ public sealed class MainForm : Form
 
         topPanel.Controls.Add(
             attachButton);
-
+        
         statusLabel = new Label
         {
-            Text =
-                "Status: Not attached",
-
-            AutoSize =
-                false,
-
-            Location =
-                new Point(
-                    10,
-                    57),
-
-            Size =
-                new Size(
-                    310,
-                    18),
-
-            ForeColor =
-                ForeColorDim
+            Text = "Status: Not attached",
+            AutoSize = false,
+            Location = new Point(10, 104),
+            Size = new Size(310, 18),
+            ForeColor = ForeColorDim
         };
+        
+        topPanel.Controls.Add(statusLabel);
 
-        topPanel.Controls.Add(
-            statusLabel);
+        var basePointerLabel = new Label
+        {
+            Text = "BASE POINTER",
+            AutoSize = true,
+            Location = new Point(10, 57),
+            ForeColor = ForeColorDim
+        };
+        
+        topPanel.Controls.Add(basePointerLabel);
+        
+        basePointerTextBox = new TextBox
+        {
+            Text = "RF_Online.bin+C28B40",
+            Location = new Point(10, 74),
+            Size = new Size(185, 25),
+            BackColor = BackColorInput,
+            ForeColor = ForeColorMain
+        };
+        
+        topPanel.Controls.Add(basePointerTextBox);
+        
+        basePointerApplyButton = new Button
+        {
+            Text = "OK",
+            Location = new Point(200, 73),
+            Size = new Size(55, 27),
+            FlatStyle = FlatStyle.Flat,
+            BackColor = BackColorInput,
+            ForeColor = ForeColorMain
+        };
+        
+        basePointerApplyButton.FlatAppearance.BorderSize = 0;
+        basePointerApplyButton.Click += (_, _) => ApplyBasePointer();
+        
+        topPanel.Controls.Add(basePointerApplyButton);
 
 
         // =====================================================
@@ -774,6 +798,77 @@ public sealed class MainForm : Form
 
         ResumeLayout(
             false);
+    }
+
+    private bool TryParseBasePointerOffset(
+        string input,
+        out long offset)
+    {
+        offset = 0;
+    
+        string value = input.Trim();
+        const string prefix = "RF_Online.bin+";
+    
+        if (value.StartsWith(
+            prefix,
+            StringComparison.OrdinalIgnoreCase))
+        {
+            value = value.Substring(prefix.Length);
+        }
+    
+        if (value.StartsWith(
+            "0x",
+            StringComparison.OrdinalIgnoreCase))
+        {
+            value = value.Substring(2);
+        }
+    
+        return long.TryParse(
+            value,
+            System.Globalization.NumberStyles.HexNumber,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out offset)
+            && offset >= 0;
+    }
+    
+    private void ApplyBasePointer()
+    {
+        if (features == null || memory == null || !IsAttached())
+        {
+            statusLabel.Text = "Status: Attach process terlebih dahulu.";
+            return;
+        }
+    
+        if (!TryParseBasePointerOffset(
+            basePointerTextBox.Text,
+            out long newOffset))
+        {
+            statusLabel.Text = "Status: Format Base Pointer tidak valid.";
+            return;
+        }
+    
+        try
+        {
+            features.SetPlayerPointerOffset(newOffset);
+    
+            UpdateAllAddresses();
+    
+            statusLabel.Text =
+                $"Status: Base Pointer diterapkan → +{newOffset:X}";
+    
+        }
+        catch (Exception ex)
+        {
+            statusLabel.Text =
+                "Status: Gagal menerapkan Base Pointer.";
+    
+            MessageBox.Show(
+                this,
+                ex.Message,
+                "Base Pointer gagal",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+        }
     }
 
 
@@ -4116,7 +4211,7 @@ public sealed class MainForm : Form
             {
                 IntPtr address =
                     memory.ResolvePointer32(
-                        0xC28B40,
+                        features!.PlayerPointerOffset,
                         entry.Offset);
 
                 entry.Address =
