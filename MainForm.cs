@@ -1975,7 +1975,36 @@ public sealed class MainForm : Form
         ResetCheckBox(reviveAutoCheck, false);
         ResetCheckBox(selected, true);
     }
-
+    
+    // =========================================================
+    // GENE TUMPUK - INITIALIZE EVENT
+    // =========================================================
+    
+    private void GeneTumpukInitializeCheck_CheckedChanged(
+        object? sender,
+        EventArgs e)
+    {
+        if (!geneTumpukInitializeCheck.Checked)
+            return;
+    
+        try
+        {
+            string[] items =
+                features.InitializeGeneTumpukDiagnostic();
+    
+            System.Diagnostics.Trace.WriteLine(
+                "=== GENE TUMPUK DIAGNOSTIC ===");
+    
+            foreach (string item in items)
+            {
+                System.Diagnostics.Trace.WriteLine(item);
+            }
+        }
+        catch
+        {
+            // Sengaja tanpa popup.
+        }
+    }
 
     private void ZoomInitializeCheck_CheckedChanged(
         object? sender,
