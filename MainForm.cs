@@ -1971,32 +1971,33 @@ public sealed class MainForm : Form
     }
     
     // =========================================================
-    // GENE TUMPUK - INITIALIZE EVENT
+    // GENE TUMPUK - TOGGLE EVENT
     // =========================================================
     
     private void GeneTumpukInitializeCheck_CheckedChanged(
         object? sender,
         EventArgs e)
     {
-        if (!geneTumpukInitializeCheck.Checked)
-            return;
-    
         try
         {
-            string[] items =
-                features.InitializeGeneTumpukDiagnostic();
-    
+            // Kirim status checkbox (true saat dicentang, false saat dimatikan)
+            features.SetGeneTumpuk(geneTumpukInitializeCheck.Checked);
+
             System.Diagnostics.Trace.WriteLine(
-                "=== GENE TUMPUK DIAGNOSTIC ===");
-    
-            foreach (string item in items)
-            {
-                System.Diagnostics.Trace.WriteLine(item);
-            }
+                $"GENE TUMPUK: {(geneTumpukInitializeCheck.Checked ? "AKTIF" : "NONAKTIF")}");
         }
-        catch
+        catch (Exception ex)
         {
-            // Sengaja tanpa popup.
+            // Jika gagal/crash saat scan/tulis memori:
+            // Lepas event sementara agar tidak memicu loop rekursif
+            geneTumpukInitializeCheck.CheckedChanged -= GeneTumpukInitializeCheck_CheckedChanged;
+            geneTumpukInitializeCheck.Checked = false;
+            geneTumpukInitializeCheck.CheckedChanged += GeneTumpukInitializeCheck_CheckedChanged;
+
+            System.Diagnostics.Trace.WriteLine($"GENE TUMPUK ERROR: {ex.Message}");
+            
+            // Opsional: Jika ingin memunculkan notifikasi error ke layar
+            // MessageBox.Show(ex.Message, "Gene Tumpuk", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }
 
