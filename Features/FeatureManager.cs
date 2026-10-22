@@ -15,7 +15,19 @@ public enum NpcTarget
 
 public sealed class FeatureManager
 {
-    private const long PlayerPointer = 0xC28B40;
+private long playerPointerOffset = 0xC28B40;
+
+public long PlayerPointerOffset => playerPointerOffset;
+
+public void SetPlayerPointerOffset(long baseOffset)
+{
+    if (baseOffset < 0)
+        throw new ArgumentOutOfRangeException(nameof(baseOffset));
+
+    memory.ResolvePointer32(baseOffset, 0);
+
+    playerPointerOffset = baseOffset;
+}
 
     private readonly MemoryAccess memory;
     private readonly AobScanner scanner;
@@ -158,7 +170,7 @@ public sealed class FeatureManager
     private IntPtr Player(long offset)
     {
         return memory.ResolvePointer32(
-            PlayerPointer,
+            playerPointerOffset,
             offset);
     }
 
