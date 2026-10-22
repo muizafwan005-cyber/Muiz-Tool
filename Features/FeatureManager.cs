@@ -448,38 +448,73 @@ public void SetPlayerPointerOffset(long baseOffset)
     
         public IntPtr InitializeCombineAob()
         {
+            // Reset alamat sebelumnya sebelum scan ulang.
             combineBase = IntPtr.Zero;
     
-            var hits = scanner.ScanProcess("00 00 00 00 1C FB 00 00");
+            var hits =
+                scanner.ScanWritable(
+                    "00 00 00 00 1C FB 00 00");
     
-            if (hits.Count != 1)
+            // Jika tidak ada sama sekali yang ditemukan, baru lempar error.
+            if (hits.Count == 0)
             {
                 throw new InvalidOperationException(
-                    $"COMBINE AOB: signature tidak unik = {hits.Count}");
+                    "COMBINE AOB: signature tidak ditemukan sama sekali.");
             }
     
-            IntPtr candidate = new IntPtr(hits[0].ToInt64() - 4);
-    
-            // Marker 1C FB 00 00 berada di hits[0] + 4 (atau candidate + 8)
-            byte[] marker = memory.ReadBytes(new IntPtr(hits[0].ToInt64() + 4), 4);
-    
-            // Little-endian: urutan byte di memori adalah 1C, FB, 00, 00
-            byte[] expected = new byte[] { 0x1C, 0xFB, 0x00, 0x00 };
-    
-            if (!marker.SequenceEqual(expected))
+            // Loop untuk mengecek semua hasil yang ditemukan (walaupun ada 2 atau lebih)
+            foreach (var hit in hits)
             {
-                string actualMarker = string.Join(" ", marker.Select(b => b.ToString("X2")));
+                // AOB ditemukan 4 byte setelah base.
+                IntPtr candidate =
+                    new IntPtr(
+                        hit.ToInt64() - 4);
     
-                throw new InvalidOperationException(
-                    $"COMBINE marker tidak valid. " +
-                    $"Candidate=0x{candidate.ToInt64():X8}; " +
-                    $"Marker aktual={actualMarker}");
+                try
+                {
+                    // Validasi marker pada Base + 0x06
+                    byte[] marker =
+                        memory.ReadBytes(
+                            new IntPtr(candidate.ToInt64() + 6),
+                            4);
+    
+                    if (marker.SequenceEqual(
+                        new byte[]
+                        {
+                            0x00,
+                            0x00,
+                            0x1C,
+                            0xFB
+                        }))
+                    {
+                        // TES MEMORI EKSTRA:
+                        // Coba baca memori pada offset terdalam (0x23DC) yang dipakai di CombineOffsets.
+                        // Jika ini memori palsu, proses baca ini akan gagal (masuk ke catch).
+                        // Jika berhasil, berarti ini adalah address Combine yang ASLI.
+                        memory.ReadBytes(
+                            new IntPtr(candidate.ToInt64() + 0x23DC),
+                            1);
+    
+                        // Alamat valid, simpan dan langsung keluar dari loop
+                        combineBase = candidate;
+                        return combineBase;
+                    }
+                }
+                catch
+                {
+                    // Jika gagal dites (memori palsu/crash), abaikan dan lanjut cek alamat yang ke-2
+                }
             }
     
-            combineBase = candidate;
+            // Jika setelah dicek semua ternyata tidak ada yang valid
+            if (combineBase == IntPtr.Zero)
+            {
+                throw new InvalidOperationException(
+                    $"COMBINE: Ditemukan {hits.Count} signature, tapi tidak ada satupun memori yang valid.");
+            }
     
             return combineBase;
-        }    
+        }
     
         public void Combine(bool enabled)
         {
