@@ -1082,7 +1082,22 @@ public void SetPlayerPointerOffset(long baseOffset)
             fastLootAddress,
             distanceAddress);
     }
+    
+    // =========================================================
+    // GENE TUMPUK - INITIALIZE
+    // =========================================================
 
+    public string[] InitializeGeneTumpukDiagnostic()
+    {
+        return new[]
+        {
+            "Burst Generator",
+            "Protect Generator",
+            "Perfect Generator",
+            "Holy Charm",
+            "Recovery Charm"
+        };
+    }
     // =========================================================
     // TAB 4 - ZOOM INITIALIZE
     // =========================================================
