@@ -462,26 +462,26 @@ public sealed class FeatureManager
                     new IntPtr(candidate.ToInt64() + 4),
                     4);
 
-            if (!marker.SequenceEqual(
-                new byte[]
-                {
-                    0x00,
-                    0x00,
-                    0xFB,
-                    0x1C
-                }))
+        if (!marker.SequenceEqual(
+            new byte[]
             {
-                string actualMarker =
-                    string.Join(
-                        " ",
-                        marker.Select(
-                            b => b.ToString("X2")));
-
-                throw new InvalidOperationException(
-                    $"COMBINE marker tidak valid. " +
-                    $"Candidate=0x{candidate.ToInt64():X8}; " +
-                    $"Marker aktual={actualMarker}");
-            }
+                0x00,
+                0x00,
+                0x1C,
+                0xFB
+            }))
+        {
+            string actualMarker =
+                string.Join(
+                    " ",
+                    marker.Select(
+                        b => b.ToString("X2")));
+        
+            throw new InvalidOperationException(
+                $"COMBINE marker tidak valid. " +
+                $"Candidate=0x{candidate.ToInt64():X8}; " +
+                $"Marker aktual={actualMarker}");
+        }
     
             combineBase = candidate;
     
