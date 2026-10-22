@@ -54,7 +54,7 @@ public sealed class MainForm : Form
     private CheckBox infernalDragonboneCheck = null!;
     private CheckBox combineCheck = null!;
     private CheckBox combineInitializeCheck = null!;
-    
+    private CheckBox geneTumpukInitializeCheck = null!;
     // =========================================================
     // TAB 4 - ZOOM / AUTO FOLLOW
     // =========================================================
@@ -1405,7 +1405,19 @@ public sealed class MainForm : Form
         tab.Controls.Add(panel);
     
         int y = 8;
-    
+        
+        // =========================================================
+        // GENE TUMPUK - INITIALIZE
+        // =========================================================
+        
+        geneTumpukInitializeCheck =
+            CreateFeatureCheckBox(
+                panel,
+                "GENE TUMPUK - INITIALIZE",
+                y);
+        
+        y += 42;
+        
         // =========================================================
         // ZOOM INITIALIZE
         // =========================================================
@@ -1810,6 +1822,9 @@ public sealed class MainForm : Form
         // =========================================================
         // EVENTS
         // =========================================================
+        
+        geneTumpukInitializeCheck.CheckedChanged +=
+            GeneTumpukInitializeCheck_CheckedChanged;
     
         zoomInitializeCheck.CheckedChanged +=
             ZoomInitializeCheck_CheckedChanged;
