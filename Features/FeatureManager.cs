@@ -1099,13 +1099,11 @@ public void SetPlayerPointerOffset(long baseOffset)
             distanceAddress);
     }
     
-    // =========================================================
-    // GENE TUMPUK - INITIALIZE
-    // =========================================================
-
-    public string[] InitializeGeneTumpukDiagnostic()
-    {
-        return new[]
+        // =========================================================
+        // GENE TUMPUK (STACK FIX)
+        // =========================================================
+    
+        private static readonly string[] GeneTumpukItems =
         {
             "Burst Generator",
             "Protect Generator",
@@ -1113,7 +1111,106 @@ public void SetPlayerPointerOffset(long baseOffset)
             "Holy Charm",
             "Recovery Charm"
         };
-    }
+    
+        private const int GeneTumpukOffset = 0x50;     // Jarak dari nama item ke byte limit stack
+        private const byte GeneTumpukOldValue = 0x11;  // Nilai asli
+        private const byte GeneTumpukNewValue = 0x14;  // Nilai baru (Stack aktif)
+    
+        // Menyimpan alamat target dan nilai aslinya untuk dipulihkan saat disable
+        private readonly Dictionary<IntPtr, byte> geneTumpukEntries = new();
+    
+        public string[] InitializeGeneTumpukDiagnostic()
+        {
+            return GeneTumpukItems.ToArray();
+        }
+    
+        /// <summary>
+        /// Mengaktifkan atau menonaktifkan fitur Gene Tumpuk
+        /// </summary>
+        public void SetGeneTumpuk(bool enabled)
+        {
+            if (enabled)
+            {
+                // Jika sudah ada yang aktif, bersihkan dulu sebelum scan ulang
+                if (geneTumpukEntries.Count > 0)
+                    SetGeneTumpuk(false);
+    
+                foreach (var name in GeneTumpukItems)
+                {
+                    // Buat AOB string dari nama item (ASCII)
+                    byte[] nameBytes = Encoding.ASCII.GetBytes(name);
+                    string pattern = string.Join(" ", nameBytes.Select(b => b.ToString("X2")));
+    
+                    var hits = scanner.ScanProcess(pattern);
+                    if (hits == null || hits.Count == 0)
+                        continue;
+    
+                    // Replikasi filter grup dari skrip Lua (prefix 2 karakter heksadesimal teratas)
+                    // Ini untuk menyaring area memori data item yang memiliki banyak string serupa
+                    var groups = hits.GroupBy(h => (h.ToInt64() >> 24) & 0xFF)
+                                     .ToDictionary(g => g.Key, g => g.Count());
+    
+                    foreach (var addr in hits)
+                    {
+                        long prefix = (addr.ToInt64() >> 24) & 0xFF;
+    
+                        // Prioritaskan prefix yang memiliki 2 atau lebih kecocokan (seperti di Lua)
+                        if (groups.ContainsKey(prefix) && groups[prefix] >= 2)
+                        {
+                            IntPtr target = new IntPtr(addr.ToInt64() + GeneTumpukOffset);
+    
+                            try
+                            {
+                                byte current = memory.ReadByte(target);
+    
+                                if (current == GeneTumpukOldValue)
+                                {
+                                    // Tulis nilai baru (0x14)
+                                    memory.WriteByte(target, GeneTumpukNewValue);
+    
+                                    // Verifikasi apakah berhasil tertulis
+                                    if (memory.ReadByte(target) == GeneTumpukNewValue)
+                                    {
+                                        geneTumpukEntries[target] = current;
+                                        break; // Berhasil untuk item ini, lanjut ke item berikutnya
+                                    }
+                                }
+                            }
+                            catch
+                            {
+                                // Lewati alamat yang terproteksi/tidak dapat dibaca
+                            }
+                        }
+                    }
+                }
+    
+                if (geneTumpukEntries.Count == 0)
+                {
+                    throw new InvalidOperationException(
+                        "Gene Tumpuk: Generator/Charm tidak ditemukan atau byte +0x50 bukan bernilai 0x11.");
+                }
+            }
+            else
+            {
+                // DISABLE: Kembalikan nilai ke semula (0x11)
+                foreach (var entry in geneTumpukEntries)
+                {
+                    try
+                    {
+                        byte current = memory.ReadByte(entry.Key);
+                        if (current == GeneTumpukNewValue)
+                        {
+                            memory.WriteByte(entry.Key, entry.Value);
+                        }
+                    }
+                    catch
+                    {
+                    }
+                }
+    
+                geneTumpukEntries.Clear();
+            }
+        }
     // =========================================================
     // TAB 4 - ZOOM INITIALIZE
     // =========================================================
@@ -1944,7 +2041,16 @@ public void SetPlayerPointerOffset(long baseOffset)
 
         originals.Clear();
 
-
+        // -----------------------------------------------------
+        // GENE TUMPUK
+        // -----------------------------------------------------
+        try
+        {
+            SetGeneTumpuk(false);
+        }
+        catch
+        {
+        }
         // -----------------------------------------------------
         // COMBINE
         // -----------------------------------------------------
