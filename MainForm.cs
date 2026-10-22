@@ -17,7 +17,7 @@ public sealed class MainForm : Form
     private const int FormWidth = 330;
     private const int FormHeight = 600;
 
-    private const int FreezeIntervalMs = 50;
+    private const int FreezeIntervalMs = 30;
 
     private MemoryAccess? memory;
     private FeatureManager? features;
