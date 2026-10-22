@@ -442,19 +442,15 @@ public void SetPlayerPointerOffset(long baseOffset)
             address,
             readBack);
     }
-
         // =========================================================
         // COMBINE
         // =========================================================
     
         public IntPtr InitializeCombineAob()
         {
-            // Reset alamat sebelumnya sebelum scan ulang.
             combineBase = IntPtr.Zero;
     
-            var hits =
-                scanner.ScanWritable(
-                    "00 00 00 00 1C FB 00 00");
+            var hits = scanner.ScanProcess("00 00 00 00 1C FB 00 00");
     
             if (hits.Count != 1)
             {
@@ -462,43 +458,28 @@ public void SetPlayerPointerOffset(long baseOffset)
                     $"COMBINE AOB: signature tidak unik = {hits.Count}");
             }
     
-            // AOB ditemukan 4 byte setelah base.
-            IntPtr candidate =
-                new IntPtr(
-                    hits[0].ToInt64() - 4);
+            IntPtr candidate = new IntPtr(hits[0].ToInt64() - 4);
     
-
-            // Validasi marker pada Base + 0x04.
-            byte[] marker =
-                memory.ReadBytes(
-                    new IntPtr(candidate.ToInt64() + 4),
-                    4);
-
-        if (!marker.SequenceEqual(
-            new byte[]
+            // Marker 1C FB 00 00 berada di hits[0] + 4 (atau candidate + 8)
+            byte[] marker = memory.ReadBytes(new IntPtr(hits[0].ToInt64() + 4), 4);
+    
+            // Little-endian: urutan byte di memori adalah 1C, FB, 00, 00
+            byte[] expected = new byte[] { 0x1C, 0xFB, 0x00, 0x00 };
+    
+            if (!marker.SequenceEqual(expected))
             {
-                0x00,
-                0x00,
-                0x1C,
-                0xFB
-            }))
-        {
-            string actualMarker =
-                string.Join(
-                    " ",
-                    marker.Select(
-                        b => b.ToString("X2")));
-        
-            throw new InvalidOperationException(
-                $"COMBINE marker tidak valid. " +
-                $"Candidate=0x{candidate.ToInt64():X8}; " +
-                $"Marker aktual={actualMarker}");
-        }
+                string actualMarker = string.Join(" ", marker.Select(b => b.ToString("X2")));
+    
+                throw new InvalidOperationException(
+                    $"COMBINE marker tidak valid. " +
+                    $"Candidate=0x{candidate.ToInt64():X8}; " +
+                    $"Marker aktual={actualMarker}");
+            }
     
             combineBase = candidate;
     
             return combineBase;
-        }
+        }    
     
         public void Combine(bool enabled)
         {
