@@ -69,34 +69,96 @@ public sealed partial class MainForm
             AllowUserToDeleteRows = false,
             AllowUserToResizeRows = false,
             MultiSelect = false,
-            ReadOnly = true,
-            SelectionMode =
-                DataGridViewSelectionMode.FullRowSelect,
-            AutoSizeColumnsMode =
-                DataGridViewAutoSizeColumnsMode.Fill,
+            ReadOnly = false,
+            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
             RowHeadersVisible = false,
-            AutoGenerateColumns = true
+            AutoGenerateColumns = false
         };
-
+        
         addressGrid.EnableHeadersVisualStyles = false;
-
+        
         addressGrid.ColumnHeadersDefaultCellStyle.BackColor =
             Color.FromArgb(40, 40, 48);
-
+        
         addressGrid.ColumnHeadersDefaultCellStyle.ForeColor =
             Color.White;
-
+        
         addressGrid.DefaultCellStyle.SelectionBackColor =
             Color.FromArgb(45, 75, 60);
-
+        
         addressGrid.DefaultCellStyle.SelectionForeColor =
             Color.White;
-
-        addressGrid.DataSource =
-            addressManager.Entries;
-
+        
+        // TEXT COLUMNS
+        addressGrid.Columns.Add(new DataGridViewTextBoxColumn
+        {
+            Name = "Description",
+            HeaderText = "Description",
+            DataPropertyName = "Description",
+            ReadOnly = true,
+            FillWeight = 120
+        });
+        
+        addressGrid.Columns.Add(new DataGridViewTextBoxColumn
+        {
+            Name = "Address",
+            HeaderText = "Address",
+            DataPropertyName = "Address",
+            ReadOnly = true,
+            FillWeight = 110
+        });
+        
+        addressGrid.Columns.Add(new DataGridViewTextBoxColumn
+        {
+            Name = "ValueType",
+            HeaderText = "Type",
+            DataPropertyName = "ValueType",
+            ReadOnly = true,
+            FillWeight = 75
+        });
+        
+        addressGrid.Columns.Add(new DataGridViewTextBoxColumn
+        {
+            Name = "Value",
+            HeaderText = "Value",
+            DataPropertyName = "Value",
+            ReadOnly = true,
+            FillWeight = 75
+        });
+        
+        addressGrid.Columns.Add(new DataGridViewTextBoxColumn
+        {
+            Name = "Group",
+            HeaderText = "Group",
+            DataPropertyName = "Group",
+            ReadOnly = true,
+            FillWeight = 85
+        });
+        
+        // FREEZE CHECKBOX
+        addressGrid.Columns.Add(new DataGridViewCheckBoxColumn
+        {
+            Name = "Freeze",
+            HeaderText = "Freeze",
+            DataPropertyName = "Freeze",
+            ReadOnly = false,
+            FillWeight = 55
+        });
+        
+        // Commit checkbox immediately after click
+        addressGrid.CurrentCellDirtyStateChanged += (_, _) =>
+        {
+            if (addressGrid.IsCurrentCellDirty)
+            {
+                addressGrid.CommitEdit(
+                    DataGridViewDataErrorContexts.Commit);
+            }
+        };
+        
+        addressGrid.DataSource = addressManager.Entries;
+        
         layout.Controls.Add(addressGrid, 0, 1);
-    }
 
     // =========================================================
     // TOOLBAR BUTTON
@@ -269,7 +331,7 @@ public sealed partial class MainForm
                 ? "Add Address"
                 : "Edit Address",
 
-            Size = new Size(400, 330),
+            Size = new Size(400, 370),
             StartPosition = FormStartPosition.CenterParent,
             FormBorderStyle = FormBorderStyle.FixedDialog,
             MaximizeBox = false,
@@ -342,18 +404,26 @@ public sealed partial class MainForm
 
         dialog.Controls.Add(typeBox);
 
-        dialog.Controls.Add(CreateLabel("Group", 140));
-
+        dialog.Controls.Add(CreateLabel("Value", 140));
+        
+        var valueBox = CreateTextBox(
+            existing?.Value ?? "0",
+            140);
+        
+        dialog.Controls.Add(valueBox);
+        
+        dialog.Controls.Add(CreateLabel("Group", 180));
+        
         var groupBox = CreateTextBox(
             existing?.Group ?? "Default",
-            140);
-
+            180);
+        
         dialog.Controls.Add(groupBox);
-
+        
         var saveButton = new Button
         {
             Text = "SAVE",
-            Location = new Point(190, 220),
+            Location = new Point(190, 250),
             Size = new Size(80, 32),
             DialogResult = DialogResult.OK
         };
@@ -361,7 +431,7 @@ public sealed partial class MainForm
         var cancelButton = new Button
         {
             Text = "CANCEL",
-            Location = new Point(280, 220),
+            Location = new Point(280, 250),
             Size = new Size(80, 32),
             DialogResult = DialogResult.Cancel
         };
@@ -393,9 +463,11 @@ public sealed partial class MainForm
             Description = descriptionBox.Text.Trim(),
             Address = addressBox.Text.Trim(),
             ValueType = typeBox.Text,
+            Value = valueBox.Text.Trim(),
             Group = string.IsNullOrWhiteSpace(groupBox.Text)
                 ? "Default"
-                : groupBox.Text.Trim()
+                : groupBox.Text.Trim(),
+            Freeze = existing?.Freeze ?? false
         };
     }
 }
