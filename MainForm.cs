@@ -3810,58 +3810,64 @@ public sealed class MainForm : Form
         return false;
     }
 
-    // -----------------------------------------------------
-    // DEFAULT NPC HOTKEY
-    // -----------------------------------------------------
-    
-    hotkeys[HotkeyAction.Npc7] =
-        new HotkeyDefinition(
-            HotkeyIdNpc7,
-            HotkeyAction.Npc7,
-            Keys.F1,
-            Keys.Control);
-    
-    hotkeys[HotkeyAction.Npc0] =
-        new HotkeyDefinition(
-            HotkeyIdNpc0,
-            HotkeyAction.Npc0,
-            Keys.F2,
-            Keys.Control);
-    
-    hotkeys[HotkeyAction.NpcMinus] =
-        new HotkeyDefinition(
-            HotkeyIdNpcMinus,
-            HotkeyAction.NpcMinus,
-            Keys.F3,
-            Keys.Control);
-    
-    hotkeys[HotkeyAction.NpcEquals] =
-        new HotkeyDefinition(
-            HotkeyIdNpcEquals,
-            HotkeyAction.NpcEquals,
-            Keys.F4,
-            Keys.Control);
-    
-    hotkeys[HotkeyAction.NpcF12] =
-        new HotkeyDefinition(
-            HotkeyIdNpcF12,
-            HotkeyAction.NpcF12,
-            Keys.F5,
-            Keys.Control);
-    
-    hotkeys[HotkeyAction.Npc8] =
-        new HotkeyDefinition(
-            HotkeyIdNpc8,
-            HotkeyAction.Npc8,
-            Keys.F6,
-            Keys.Control);
-    
-    hotkeys[HotkeyAction.NpcF11] =
-        new HotkeyDefinition(
-            HotkeyIdNpcF11,
-            HotkeyAction.NpcF11,
-            Keys.F7,
-            Keys.Control);
+    // =========================================================
+    // LOAD HOTKEY
+    // =========================================================
+
+    private void LoadHotkeys()
+    {
+        // -----------------------------------------------------
+        // DEFAULT NPC HOTKEY
+        // -----------------------------------------------------
+
+        hotkeys[HotkeyAction.Npc7] =
+            new HotkeyDefinition(
+                HotkeyIdNpc7,
+                HotkeyAction.Npc7,
+                Keys.F1,
+                Keys.Control);
+
+        hotkeys[HotkeyAction.Npc0] =
+            new HotkeyDefinition(
+                HotkeyIdNpc0,
+                HotkeyAction.Npc0,
+                Keys.F2,
+                Keys.Control);
+
+        hotkeys[HotkeyAction.NpcMinus] =
+            new HotkeyDefinition(
+                HotkeyIdNpcMinus,
+                HotkeyAction.NpcMinus,
+                Keys.F3,
+                Keys.Control);
+
+        hotkeys[HotkeyAction.NpcEquals] =
+            new HotkeyDefinition(
+                HotkeyIdNpcEquals,
+                HotkeyAction.NpcEquals,
+                Keys.F4,
+                Keys.Control);
+
+        hotkeys[HotkeyAction.NpcF12] =
+            new HotkeyDefinition(
+                HotkeyIdNpcF12,
+                HotkeyAction.NpcF12,
+                Keys.F5,
+                Keys.Control);
+
+        hotkeys[HotkeyAction.Npc8] =
+            new HotkeyDefinition(
+                HotkeyIdNpc8,
+                HotkeyAction.Npc8,
+                Keys.F6,
+                Keys.Control);
+
+        hotkeys[HotkeyAction.NpcF11] =
+            new HotkeyDefinition(
+                HotkeyIdNpcF11,
+                HotkeyAction.NpcF11,
+                Keys.F7,
+                Keys.Control);
 
 
         // -----------------------------------------------------
