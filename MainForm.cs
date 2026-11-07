@@ -1379,7 +1379,7 @@ public sealed class MainForm : Form
                 "SCROLL ZOOM - INITIALIZE",
                 y);
 
-        y += 25;
+        y += 35;
 
         scrollZoomValueLabel = new Label
         {
@@ -1408,7 +1408,7 @@ public sealed class MainForm : Form
 
         panel.Controls.Add(scrollZoomTrackBar);
 
-        y += 45;
+        y += 25;
 
         scrollZoomFreezeCheck =
             CreateFeatureCheckBox(
