@@ -60,7 +60,8 @@ public void SetPlayerPointerOffset(long baseOffset)
     private IntPtr showNameAddress = IntPtr.Zero;
     private IntPtr fastLootAddress = IntPtr.Zero;
     private IntPtr distanceAddress = IntPtr.Zero;
-
+    // SCROLL ZOOM
+    private IntPtr scrollZoomAddress = IntPtr.Zero;
 
     // =========================================================
     // AUTO FOLLOW AOB
