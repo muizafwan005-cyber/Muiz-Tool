@@ -183,6 +183,16 @@ public sealed class MemoryAccess : IDisposable
 
 
     // =========================================================
+    // READ FLOAT
+    // =========================================================
+    public float ReadFloat(IntPtr address)
+    {
+        var bytes = ReadBytes(address, 4);
+
+        return BitConverter.ToSingle(bytes, 0);
+    }
+
+    // =========================================================
     // READ POINTER 32-BIT
     // =========================================================
 
