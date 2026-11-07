@@ -64,7 +64,6 @@ public sealed class MainForm : Form
     private CheckBox scrollZoomFreezeCheck = null!;
     private TrackBar scrollZoomTrackBar = null!;
     private Label scrollZoomValueLabel = null!;
-    private int scrollZoomOriginalTop;
     private float scrollZoomCurrentValue = 0f;
     private readonly System.Windows.Forms.Timer scrollZoomFreezeTimer =
         new System.Windows.Forms.Timer
@@ -1411,10 +1410,7 @@ public sealed class MainForm : Form
         scrollZoomFreezeCheck.Visible = false;
         
         y += 34;
-        
-        scrollZoomOriginalTop =
-            scrollZoomInitializeCheck.Top;
-            
+                    
         // =====================================================
         // EVENTS
         // =====================================================
@@ -1451,6 +1447,7 @@ public sealed class MainForm : Form
             
         scrollZoomFreezeTimer.Tick +=
             ScrollZoomFreezeTimer_Tick;
+        UpdateTab2Layout();
     }
     // =========================================================
     // SCROLL ZOOM - INITIALIZE
@@ -5600,17 +5597,49 @@ public sealed class MainForm : Form
     }
 
     // =========================================================
-    // SCROLL ZOOM POSITION
+    // TAB 2 LAYOUT
     // =========================================================
     
     private void SetScrollZoomPosition(bool combineVisible)
     {
-        int offset = combineVisible ? 34 : 0;
+        UpdateTab2Layout();
+    }
     
-        scrollZoomInitializeCheck.Top += offset;
-        scrollZoomValueLabel.Top += offset;
-        scrollZoomTrackBar.Top += offset;
-        scrollZoomFreezeCheck.Top += offset;
+    private void UpdateTab2Layout()
+    {
+        if (combineInitializeCheck == null ||
+            combineCheck == null ||
+            scrollZoomInitializeCheck == null ||
+            scrollZoomValueLabel == null ||
+            scrollZoomTrackBar == null ||
+            scrollZoomFreezeCheck == null)
+        {
+            return;
+        }
+    
+        // Combine Jarak Jauh tepat di bawah Combine Initialize
+        combineCheck.Top =
+            combineInitializeCheck.Bottom;
+    
+        // Jika Combine Jarak Jauh tampil, Scroll Zoom turun di bawahnya.
+        // Jika tidak, Scroll Zoom langsung di bawah Combine Initialize.
+        int nextTop =
+            combineCheck.Visible
+                ? combineCheck.Bottom
+                : combineInitializeCheck.Bottom;
+    
+        scrollZoomInitializeCheck.Top =
+            nextTop + 10;
+    
+        scrollZoomValueLabel.Top =
+            scrollZoomInitializeCheck.Bottom;
+    
+        scrollZoomTrackBar.Top =
+            scrollZoomValueLabel.Bottom + 5;
+    
+        // Freeze tepat di bawah trackbar
+        scrollZoomFreezeCheck.Top =
+            scrollZoomTrackBar.Bottom + 2;
     }
 
 
