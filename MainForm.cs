@@ -1390,7 +1390,7 @@ public sealed class MainForm : Form
 
         panel.Controls.Add(scrollZoomValueLabel);
 
-        y += 20;
+        y += 30;
 
         scrollZoomTrackBar = new TrackBar
         {
@@ -1417,7 +1417,8 @@ public sealed class MainForm : Form
                 y);
 
         scrollZoomFreezeCheck.Enabled = false;
-
+        scrollZoomFreezeCheck.Visible = false;
+        
         y += 34;
 
         // =====================================================
@@ -1467,6 +1468,11 @@ public sealed class MainForm : Form
     {
         if (features == null)
         {
+            scrollZoomFreezeTimer.Stop();
+    
+            scrollZoomFreezeCheck.Visible = false;
+            scrollZoomFreezeCheck.Enabled = false;
+    
             ResetCheckBox(scrollZoomInitializeCheck, false);
             return;
         }
@@ -1478,6 +1484,7 @@ public sealed class MainForm : Form
             ResetCheckBox(scrollZoomFreezeCheck, false);
     
             scrollZoomTrackBar.Enabled = false;
+            scrollZoomFreezeCheck.Visible = false;
             scrollZoomFreezeCheck.Enabled = false;
     
             features.ClearScrollZoom();
@@ -1487,7 +1494,6 @@ public sealed class MainForm : Form
     
             statusLabel.Text =
                 "Status: Scroll Zoom Initialize OFF";
-    
             return;
         }
     
@@ -1510,6 +1516,7 @@ public sealed class MainForm : Form
             scrollZoomTrackBar.Value = sliderValue;
     
             scrollZoomTrackBar.Enabled = true;
+            scrollZoomFreezeCheck.Visible = true;
             scrollZoomFreezeCheck.Enabled = true;
     
             scrollZoomValueLabel.Text =
@@ -1521,6 +1528,7 @@ public sealed class MainForm : Form
         catch (Exception ex)
         {
             scrollZoomTrackBar.Enabled = false;
+            scrollZoomFreezeCheck.Visible = false;
             scrollZoomFreezeCheck.Enabled = false;
     
             HandleFeatureError(
