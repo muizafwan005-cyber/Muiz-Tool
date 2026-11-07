@@ -2265,11 +2265,23 @@ public sealed class MainForm : Form
         object? sender,
         EventArgs e)
     {
+        // ===== BAGIAN BARU: mulai =====
+        if (features == null)
+        {
+            geneTumpukInitializeCheck.CheckedChanged -= GeneTumpukInitializeCheck_CheckedChanged;
+            geneTumpukInitializeCheck.Checked = false;
+            geneTumpukInitializeCheck.CheckedChanged += GeneTumpukInitializeCheck_CheckedChanged;
+    
+            statusLabel.Text = "Status: Attach process terlebih dahulu.";
+            return;
+        }
+        // ===== BAGIAN BARU: selesai =====
+    
         try
         {
             // Kirim status checkbox (true saat dicentang, false saat dimatikan)
             features.SetGeneTumpuk(geneTumpukInitializeCheck.Checked);
-
+    
             System.Diagnostics.Trace.WriteLine(
                 $"GENE TUMPUK: {(geneTumpukInitializeCheck.Checked ? "AKTIF" : "NONAKTIF")}");
         }
@@ -2280,11 +2292,8 @@ public sealed class MainForm : Form
             geneTumpukInitializeCheck.CheckedChanged -= GeneTumpukInitializeCheck_CheckedChanged;
             geneTumpukInitializeCheck.Checked = false;
             geneTumpukInitializeCheck.CheckedChanged += GeneTumpukInitializeCheck_CheckedChanged;
-
+    
             System.Diagnostics.Trace.WriteLine($"GENE TUMPUK ERROR: {ex.Message}");
-            
-            // Opsional: Jika ingin memunculkan notifikasi error ke layar
-            // MessageBox.Show(ex.Message, "Gene Tumpuk", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }
 
