@@ -1341,8 +1341,8 @@ public sealed class MainForm : Form
                 "COMBINE AOB - INITIALIZE",
                 y);
 
-        y += 34;
-
+        y += 25;
+        
         combineCheck =
             CreateFeatureCheckBox(
                 panel,
