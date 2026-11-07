@@ -2186,7 +2186,6 @@ public void SetPlayerPointerOffset(long baseOffset)
         public void ClearScrollZoom()
         {
             scrollZoomAddress = IntPtr.Zero;
-        }
-    
-    }
+     }
+
 }
