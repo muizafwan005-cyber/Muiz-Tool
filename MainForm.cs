@@ -64,7 +64,7 @@ public sealed class MainForm : Form
     private CheckBox scrollZoomFreezeCheck = null!;
     private TrackBar scrollZoomTrackBar = null!;
     private Label scrollZoomValueLabel = null!;
-
+    private int scrollZoomOriginalTop;
     private float scrollZoomCurrentValue = 0f;
     private readonly System.Windows.Forms.Timer scrollZoomFreezeTimer =
         new System.Windows.Forms.Timer
@@ -407,17 +407,7 @@ public sealed class MainForm : Form
                     target);
 
             string commandName =
-                action switch
-                {
-                    HotkeyAction.Npc7 => "7",
-                    HotkeyAction.Npc0 => "0",
-                    HotkeyAction.NpcMinus => "-",
-                    HotkeyAction.NpcEquals => "=",
-                    HotkeyAction.NpcF12 => "F12",
-                    HotkeyAction.Npc8 => "8",
-                    HotkeyAction.NpcF11 => "F11",
-                    _ => "?"
-                };
+                nameFor(action);
 
             string targetName =
                 target switch
@@ -429,12 +419,12 @@ public sealed class MainForm : Form
                 };
 
             statusLabel.Text =
-                $"Status: NPC {commandName} → {targetName} updated";
+                $"Status: {commandName} → {targetName} updated";
         }
         catch (Exception ex)
         {
             HandleFeatureError(
-                "NPC " + HotkeyDisplayName(action),
+                nameFor(action),
                 ex);
         }
     }
@@ -1369,6 +1359,7 @@ public sealed class MainForm : Form
         combineCheck.Enabled = false;
 
         y += 34;
+        
         // =====================================================
         // SCROLL ZOOM
         // =====================================================
@@ -1408,7 +1399,7 @@ public sealed class MainForm : Form
 
         panel.Controls.Add(scrollZoomTrackBar);
 
-        y += 25;
+        y += 15;
 
         scrollZoomFreezeCheck =
             CreateFeatureCheckBox(
@@ -1420,7 +1411,10 @@ public sealed class MainForm : Form
         scrollZoomFreezeCheck.Visible = false;
         
         y += 34;
-
+        
+        scrollZoomOriginalTop =
+            scrollZoomInitializeCheck.Top;
+            
         // =====================================================
         // EVENTS
         // =====================================================
@@ -3004,71 +2998,72 @@ public sealed class MainForm : Form
         int y = 82;
 
 
+
         // -----------------------------------------------------
         // NPC COMMANDS
         // -----------------------------------------------------
-
+        
         npc7HotkeyBox =
             AddHotkeyRow(
                 panel,
-                "NPC 7",
+                "NPC Amunisi",
                 HotkeyAction.Npc7,
                 y);
-
+        
         y += 72;
-
+        
         npc0HotkeyBox =
             AddHotkeyRow(
                 panel,
-                "NPC 0",
+                "NPC Bank",
                 HotkeyAction.Npc0,
                 y);
-
+        
         y += 72;
-
+        
         npcMinusHotkeyBox =
             AddHotkeyRow(
                 panel,
-                "NPC -",
+                "NPC TOOL",
                 HotkeyAction.NpcMinus,
                 y);
-
+        
         y += 72;
-
+        
         npcEqualsHotkeyBox =
             AddHotkeyRow(
                 panel,
-                "NPC =",
+                "NPC UMT",
                 HotkeyAction.NpcEquals,
                 y);
-
+        
         y += 72;
-
+        
         npcF12HotkeyBox =
             AddHotkeyRow(
                 panel,
-                "NPC F12",
+                "NPC Potion",
                 HotkeyAction.NpcF12,
                 y);
-
+        
         y += 72;
-
+        
         npc8HotkeyBox =
             AddHotkeyRow(
                 panel,
-                "NPC 8",
+                "NPC Vendor",
                 HotkeyAction.Npc8,
                 y);
-
+        
         y += 72;
-
+        
         npcF11HotkeyBox =
             AddHotkeyRow(
                 panel,
-                "NPC F11",
+                "NPC Hero",
                 HotkeyAction.NpcF11,
                 y);
-
+        
         y += 82;
 
 
@@ -3600,26 +3595,26 @@ public sealed class MainForm : Form
         return action switch
         {
             HotkeyAction.Npc7 =>
-                "NPC 7",
-
+                "NPC Amunisi",
+    
             HotkeyAction.Npc0 =>
-                "NPC 0",
-
+                "NPC Bank",
+    
             HotkeyAction.NpcMinus =>
-                "NPC -",
-
+                "NPC TOOL",
+    
             HotkeyAction.NpcEquals =>
-                "NPC =",
-
+                "NPC UMT",
+    
             HotkeyAction.NpcF12 =>
-                "NPC F12",
-
+                "NPC Potion",
+    
             HotkeyAction.Npc8 =>
-                "NPC 8",
-
+                "NPC Vendor",
+    
             HotkeyAction.NpcF11 =>
-                "NPC F11",
-
+                "NPC Hero",
+    
             _ =>
                 "Unknown"
         };
@@ -3815,68 +3810,58 @@ public sealed class MainForm : Form
         return false;
     }
 
-
-    // =========================================================
-    // LOAD HOTKEY
-    // =========================================================
-
-    private void LoadHotkeys()
-    {
-        hotkeys.Clear();
-
-
-        // -----------------------------------------------------
-        // DEFAULT NPC HOTKEY
-        // -----------------------------------------------------
-
-        hotkeys[HotkeyAction.Npc7] =
-            new HotkeyDefinition(
-                HotkeyIdNpc7,
-                HotkeyAction.Npc7,
-                Keys.D7,
-                Keys.None);
-
-        hotkeys[HotkeyAction.Npc0] =
-            new HotkeyDefinition(
-                HotkeyIdNpc0,
-                HotkeyAction.Npc0,
-                Keys.D0,
-                Keys.None);
-
-        hotkeys[HotkeyAction.NpcMinus] =
-            new HotkeyDefinition(
-                HotkeyIdNpcMinus,
-                HotkeyAction.NpcMinus,
-                Keys.OemMinus,
-                Keys.None);
-
-        hotkeys[HotkeyAction.NpcEquals] =
-            new HotkeyDefinition(
-                HotkeyIdNpcEquals,
-                HotkeyAction.NpcEquals,
-                Keys.Oemplus,
-                Keys.None);
-
-        hotkeys[HotkeyAction.NpcF12] =
-            new HotkeyDefinition(
-                HotkeyIdNpcF12,
-                HotkeyAction.NpcF12,
-                Keys.F12,
-                Keys.None);
-
-        hotkeys[HotkeyAction.Npc8] =
-            new HotkeyDefinition(
-                HotkeyIdNpc8,
-                HotkeyAction.Npc8,
-                Keys.D8,
-                Keys.None);
-
-        hotkeys[HotkeyAction.NpcF11] =
-            new HotkeyDefinition(
-                HotkeyIdNpcF11,
-                HotkeyAction.NpcF11,
-                Keys.F11,
-                Keys.None);
+    // -----------------------------------------------------
+    // DEFAULT NPC HOTKEY
+    // -----------------------------------------------------
+    
+    hotkeys[HotkeyAction.Npc7] =
+        new HotkeyDefinition(
+            HotkeyIdNpc7,
+            HotkeyAction.Npc7,
+            Keys.F1,
+            Keys.Control);
+    
+    hotkeys[HotkeyAction.Npc0] =
+        new HotkeyDefinition(
+            HotkeyIdNpc0,
+            HotkeyAction.Npc0,
+            Keys.F2,
+            Keys.Control);
+    
+    hotkeys[HotkeyAction.NpcMinus] =
+        new HotkeyDefinition(
+            HotkeyIdNpcMinus,
+            HotkeyAction.NpcMinus,
+            Keys.F3,
+            Keys.Control);
+    
+    hotkeys[HotkeyAction.NpcEquals] =
+        new HotkeyDefinition(
+            HotkeyIdNpcEquals,
+            HotkeyAction.NpcEquals,
+            Keys.F4,
+            Keys.Control);
+    
+    hotkeys[HotkeyAction.NpcF12] =
+        new HotkeyDefinition(
+            HotkeyIdNpcF12,
+            HotkeyAction.NpcF12,
+            Keys.F5,
+            Keys.Control);
+    
+    hotkeys[HotkeyAction.Npc8] =
+        new HotkeyDefinition(
+            HotkeyIdNpc8,
+            HotkeyAction.Npc8,
+            Keys.F6,
+            Keys.Control);
+    
+    hotkeys[HotkeyAction.NpcF11] =
+        new HotkeyDefinition(
+            HotkeyIdNpcF11,
+            HotkeyAction.NpcF11,
+            Keys.F7,
+            Keys.Control);
 
 
         // -----------------------------------------------------
@@ -4137,71 +4122,69 @@ public sealed class MainForm : Form
     // RESET HOTKEY
     // =========================================================
 
+
     private void ResetHotkeysToDefault()
     {
         UnregisterAllHotkeys();
-
-
+    
         hotkeys[HotkeyAction.Npc7] =
             new HotkeyDefinition(
                 HotkeyIdNpc7,
                 HotkeyAction.Npc7,
-                Keys.D7,
-                Keys.None);
-
+                Keys.F1,
+                Keys.Control);
+    
         hotkeys[HotkeyAction.Npc0] =
             new HotkeyDefinition(
                 HotkeyIdNpc0,
                 HotkeyAction.Npc0,
-                Keys.D0,
-                Keys.None);
-
+                Keys.F2,
+                Keys.Control);
+    
         hotkeys[HotkeyAction.NpcMinus] =
             new HotkeyDefinition(
                 HotkeyIdNpcMinus,
                 HotkeyAction.NpcMinus,
-                Keys.OemMinus,
-                Keys.None);
-
+                Keys.F3,
+                Keys.Control);
+    
         hotkeys[HotkeyAction.NpcEquals] =
             new HotkeyDefinition(
                 HotkeyIdNpcEquals,
                 HotkeyAction.NpcEquals,
-                Keys.Oemplus,
-                Keys.None);
-
+                Keys.F4,
+                Keys.Control);
+    
         hotkeys[HotkeyAction.NpcF12] =
             new HotkeyDefinition(
                 HotkeyIdNpcF12,
                 HotkeyAction.NpcF12,
-                Keys.F12,
-                Keys.None);
-
+                Keys.F5,
+                Keys.Control);
+    
         hotkeys[HotkeyAction.Npc8] =
             new HotkeyDefinition(
                 HotkeyIdNpc8,
                 HotkeyAction.Npc8,
-                Keys.D8,
-                Keys.None);
-
+                Keys.F6,
+                Keys.Control);
+    
         hotkeys[HotkeyAction.NpcF11] =
             new HotkeyDefinition(
                 HotkeyIdNpcF11,
                 HotkeyAction.NpcF11,
-                Keys.F11,
-                Keys.None);
-
-
+                Keys.F7,
+                Keys.Control);
+    
         UpdateHotkeyBoxes();
-
+    
         RegisterAllHotkeys();
-
+    
         SaveHotkeys();
-
+    
         statusLabel.Text =
             "Status: Hotkey kembali ke default";
     }
-
 
     // =========================================================
     // SAVED HOTKEY DATA
@@ -5537,63 +5520,83 @@ public sealed class MainForm : Form
             }
         }
 
-        // =========================================================
-        // COMBINE AOB - INITIALIZE
-        // =========================================================
-
-        private void CombineInitializeCheck_CheckedChanged(
-            object? sender,
-            EventArgs e)
+    // =========================================================
+    // COMBINE AOB - INITIALIZE
+    // =========================================================
+    
+    private void CombineInitializeCheck_CheckedChanged(
+        object? sender,
+        EventArgs e)
+    {
+        if (features == null)
         {
-            if (features == null)
-            {
-                ResetCheckBox(
-                    combineInitializeCheck,
-                    false);
-
-                return;
-            }
-
-            if (!combineInitializeCheck.Checked)
-            {
-                ResetCheckBox(
-                    combineCheck,
-                    false);
-
-                combineCheck.Visible = false;
-                combineCheck.Enabled = false;
-
-                statusLabel.Text =
-                    "Status: Combine Initialize OFF";
-
-                return;
-            }
-
-            try
-            {
-                IntPtr address =
-                    features.InitializeCombineAob();
-
-                combineCheck.Visible = true;
-                combineCheck.Enabled = true;
-
-                statusLabel.Text =
-                    $"Status: Combine AOB OK → 0x{address.ToInt64():X8}";
-            }
-            catch (Exception ex)
-            {
-                combineCheck.Visible = false;
-                combineCheck.Enabled = false;
-
-                HandleFeatureError(
-                    "COMBINE AOB - INITIALIZE",
-                    ex);
-
-                ResetCheckBox(
-                    combineInitializeCheck,
-                    false);
-            }
+            ResetCheckBox(
+                combineInitializeCheck,
+                false);
+    
+            return;
         }
+    
+        if (!combineInitializeCheck.Checked)
+        {
+            ResetCheckBox(
+                combineCheck,
+                false);
+    
+            combineCheck.Visible = false;
+            combineCheck.Enabled = false;
+    
+            SetScrollZoomPosition(false);
+    
+            statusLabel.Text =
+                "Status: Combine Initialize OFF";
+    
+            return;
+        }
+    
+        try
+        {
+            IntPtr address =
+                features.InitializeCombineAob();
+    
+            combineCheck.Visible = true;
+            combineCheck.Enabled = true;
+    
+            SetScrollZoomPosition(true);
+    
+            statusLabel.Text =
+                $"Status: Combine AOB OK → 0x{address.ToInt64():X8}";
+        }
+        catch (Exception ex)
+        {
+            combineCheck.Visible = false;
+            combineCheck.Enabled = false;
+    
+            SetScrollZoomPosition(false);
+    
+            HandleFeatureError(
+                "COMBINE AOB - INITIALIZE",
+                ex);
+    
+            ResetCheckBox(
+                combineInitializeCheck,
+                false);
+        }
+    }
+
+    // =========================================================
+    // SCROLL ZOOM POSITION
+    // =========================================================
+    
+    private void SetScrollZoomPosition(bool combineVisible)
+    {
+        int offset = combineVisible ? 34 : 0;
+    
+        scrollZoomInitializeCheck.Top += offset;
+        scrollZoomValueLabel.Top += offset;
+        scrollZoomTrackBar.Top += offset;
+        scrollZoomFreezeCheck.Top += offset;
+    }
 
 
     // =========================================================
