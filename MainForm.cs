@@ -452,17 +452,33 @@ public sealed partial class MainForm : Form
 
         BuildTab4(
             tab4);
-
-
-        Controls.Add(
-            tabs);
-
-        Controls.Add(
-            topPanel);
-
-        ResumeLayout(
-            false);
-    }
+            
+        // =====================================================
+        // TAB 5
+        // =====================================================
+        
+        var tab5 = new TabPage
+        {
+            Text = "ADVANCED",
+        
+            BackColor = BackColorMain,
+        
+            ForeColor = ForeColorMain
+        };
+        
+        tabs.TabPages.Add(tab5);
+        
+        BuildTab5(tab5);
+        
+                Controls.Add(
+                    tabs);
+        
+                Controls.Add(
+                    topPanel);
+        
+                ResumeLayout(
+                    false);
+            }
 
     // =========================================================
     // 5. PROCESS, ATTACH & DETACH
