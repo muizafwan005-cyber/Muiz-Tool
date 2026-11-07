@@ -38,7 +38,9 @@ public void SetPlayerPointerOffset(long baseOffset)
     private IntPtr stage5Address = IntPtr.Zero;
     private IntPtr stage3Address = IntPtr.Zero;
     private IntPtr infernalDragonboneAddress = IntPtr.Zero;
-
+    // SCROLL ZOOM
+    private IntPtr scrollZoomAddress = IntPtr.Zero;
+    
     // =========================================================
     // NPC DYNAMIC ADDRESSES
     // =========================================================
@@ -60,8 +62,7 @@ public void SetPlayerPointerOffset(long baseOffset)
     private IntPtr showNameAddress = IntPtr.Zero;
     private IntPtr fastLootAddress = IntPtr.Zero;
     private IntPtr distanceAddress = IntPtr.Zero;
-    // SCROLL ZOOM
-    private IntPtr scrollZoomAddress = IntPtr.Zero;
+
 
     // =========================================================
     // AUTO FOLLOW AOB
@@ -2130,5 +2131,62 @@ public void SetPlayerPointerOffset(long baseOffset)
         // -----------------------------------------------------
 
         ResetAobAddresses();
+    }
+        // =========================================================
+        // SCROLL ZOOM
+        // =========================================================
+    
+        public IntPtr InitializeScrollZoom()
+        {
+            scrollZoomAddress =
+                memory.ModuleAddress(0xC9F960);
+    
+            float currentValue =
+                memory.ReadFloat(scrollZoomAddress);
+    
+            if (float.IsNaN(currentValue) ||
+                float.IsInfinity(currentValue))
+            {
+                scrollZoomAddress = IntPtr.Zero;
+    
+                throw new InvalidOperationException(
+                    "Scroll Zoom memiliki nilai Float tidak valid.");
+            }
+    
+            return scrollZoomAddress;
+        }
+    
+        public float ReadScrollZoom()
+        {
+            if (scrollZoomAddress == IntPtr.Zero)
+                throw new InvalidOperationException(
+                    "Scroll Zoom belum di-initialize.");
+    
+            return memory.ReadFloat(scrollZoomAddress);
+        }
+    
+        public void SetScrollZoom(float value)
+        {
+            if (scrollZoomAddress == IntPtr.Zero)
+                throw new InvalidOperationException(
+                    "Scroll Zoom belum di-initialize.");
+    
+            if (float.IsNaN(value) ||
+                float.IsInfinity(value) ||
+                value < 0f ||
+                value > 1500f)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(value));
+            }
+    
+            memory.WriteFloat(scrollZoomAddress, value);
+        }
+    
+        public void ClearScrollZoom()
+        {
+            scrollZoomAddress = IntPtr.Zero;
+        }
+    
     }
 }
