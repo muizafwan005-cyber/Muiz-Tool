@@ -159,7 +159,7 @@ public sealed partial class MainForm
         addressGrid.DataSource = addressManager.Entries;
         
         layout.Controls.Add(addressGrid, 0, 1);
-
+    }
     // =========================================================
     // TOOLBAR BUTTON
     // =========================================================
