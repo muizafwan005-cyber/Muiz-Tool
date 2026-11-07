@@ -93,25 +93,15 @@ public sealed partial class MainForm : Form
         StartPosition =
             FormStartPosition.CenterScreen;
     
-        ClientSize =
-            new Size(
-                FormWidth,
-                FormHeight);
-    
-        MinimumSize =
-            new Size(
-                FormWidth,
-                FormHeight);
-    
-        MaximumSize =
-            new Size(
-                FormWidth,
-                FormHeight);
-    
-        FormBorderStyle =
-            FormBorderStyle.FixedSingle;
-    
-        MaximizeBox = false;
+        ClientSize = new Size(850, 650);
+        
+        MinimumSize = new Size(650, 500);
+        
+        MaximumSize = Size.Empty;
+        
+        FormBorderStyle = FormBorderStyle.Sizable;
+        
+        MaximizeBox = true;
     
         BackColor =
             BackColorMain;
