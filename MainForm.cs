@@ -4742,7 +4742,7 @@ public sealed class MainForm : Form
         {
             IntPtr address =
                 memory.ResolvePointer32(
-                    0xC28B40,
+                    features!.PlayerPointerOffset,
                     entry.Offset);
 
             entry.Address =
@@ -4779,7 +4779,7 @@ public sealed class MainForm : Form
         {
             IntPtr address =
                 memory.ResolvePointer32(
-                    0xC28B40,
+                    features!.PlayerPointerOffset,
                     entry.Offset);
 
             entry.Address =
