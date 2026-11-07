@@ -55,6 +55,22 @@ public sealed class MainForm : Form
     private CheckBox combineCheck = null!;
     private CheckBox combineInitializeCheck = null!;
     private CheckBox geneTumpukInitializeCheck = null!;
+    
+    // =========================================================
+    // SCROLL ZOOM
+    // =========================================================
+
+    private CheckBox scrollZoomInitializeCheck = null!;
+    private CheckBox scrollZoomFreezeCheck = null!;
+    private TrackBar scrollZoomTrackBar = null!;
+    private Label scrollZoomValueLabel = null!;
+
+    private float scrollZoomCurrentValue = 0f;
+    private readonly System.Windows.Forms.Timer scrollZoomFreezeTimer =
+        new System.Windows.Forms.Timer
+        {
+            Interval = 50
+        };
     // =========================================================
     // TAB 4 - ZOOM / AUTO FOLLOW
     // =========================================================
@@ -1353,7 +1369,56 @@ public sealed class MainForm : Form
         combineCheck.Enabled = false;
 
         y += 34;
+        // =====================================================
+        // SCROLL ZOOM
+        // =====================================================
 
+        scrollZoomInitializeCheck =
+            CreateFeatureCheckBox(
+                panel,
+                "SCROLL ZOOM - INITIALIZE",
+                y);
+
+        y += 25;
+
+        scrollZoomValueLabel = new Label
+        {
+            Text = "Zoom: Belum Initialize",
+            Location = new Point(10, y),
+            AutoSize = true
+        };
+
+        panel.Controls.Add(scrollZoomValueLabel);
+
+        y += 20;
+
+        scrollZoomTrackBar = new TrackBar
+        {
+            Minimum = 0,
+            Maximum = 1500,
+            Value = 0,
+            TickFrequency = 50,
+            SmallChange = 50,
+            LargeChange = 50,
+            Location = new Point(5, y),
+            Width = 290,
+            Height = 45,
+            Enabled = false
+        };
+
+        panel.Controls.Add(scrollZoomTrackBar);
+
+        y += 45;
+
+        scrollZoomFreezeCheck =
+            CreateFeatureCheckBox(
+                panel,
+                "Scroll Zoom Freeze",
+                y);
+
+        scrollZoomFreezeCheck.Enabled = false;
+
+        y += 34;
 
         // =====================================================
         // EVENTS
@@ -1379,8 +1444,219 @@ public sealed class MainForm : Form
 
         combineCheck.CheckedChanged +=
             CombineCheck_CheckedChanged;
-    }
+            
+        scrollZoomInitializeCheck.CheckedChanged +=
+            ScrollZoomInitializeCheck_CheckedChanged;
 
+        scrollZoomTrackBar.Scroll +=
+            ScrollZoomTrackBar_Scroll;
+
+        scrollZoomFreezeCheck.CheckedChanged +=
+            ScrollZoomFreezeCheck_CheckedChanged;
+            
+        scrollZoomFreezeTimer.Tick +=
+            ScrollZoomFreezeTimer_Tick;
+    }
+    // =========================================================
+    // SCROLL ZOOM - INITIALIZE
+    // =========================================================
+    
+    private void ScrollZoomInitializeCheck_CheckedChanged(
+        object? sender,
+        EventArgs e)
+    {
+        if (features == null)
+        {
+            ResetCheckBox(scrollZoomInitializeCheck, false);
+            return;
+        }
+    
+        if (!scrollZoomInitializeCheck.Checked)
+        {
+            scrollZoomFreezeTimer.Stop();
+    
+            ResetCheckBox(scrollZoomFreezeCheck, false);
+    
+            scrollZoomTrackBar.Enabled = false;
+            scrollZoomFreezeCheck.Enabled = false;
+    
+            features.ClearScrollZoom();
+    
+            scrollZoomValueLabel.Text =
+                "Zoom: Belum Initialize";
+    
+            statusLabel.Text =
+                "Status: Scroll Zoom Initialize OFF";
+    
+            return;
+        }
+    
+        try
+        {
+            features.InitializeScrollZoom();
+    
+            float currentValue =
+                features.ReadScrollZoom();
+    
+            scrollZoomCurrentValue = currentValue;
+    
+            int sliderValue =
+                (int)Math.Round(currentValue / 50f) * 50;
+    
+            sliderValue = Math.Max(
+                0,
+                Math.Min(1500, sliderValue));
+    
+            scrollZoomTrackBar.Value = sliderValue;
+    
+            scrollZoomTrackBar.Enabled = true;
+            scrollZoomFreezeCheck.Enabled = true;
+    
+            scrollZoomValueLabel.Text =
+                $"Zoom: {currentValue:0.##}";
+    
+            statusLabel.Text =
+                "Status: Scroll Zoom Initialize OK";
+        }
+        catch (Exception ex)
+        {
+            scrollZoomTrackBar.Enabled = false;
+            scrollZoomFreezeCheck.Enabled = false;
+    
+            HandleFeatureError(
+                "SCROLL ZOOM - INITIALIZE",
+                ex);
+    
+            ResetCheckBox(
+                scrollZoomInitializeCheck,
+                false);
+        }
+    }
+    
+    
+    // =========================================================
+    // SCROLL ZOOM - SLIDER
+    // =========================================================
+    
+    private void ScrollZoomTrackBar_Scroll(
+        object? sender,
+        EventArgs e)
+    {
+        if (features == null ||
+            !scrollZoomInitializeCheck.Checked)
+            return;
+    
+        try
+        {
+            scrollZoomCurrentValue =
+                scrollZoomTrackBar.Value;
+    
+            features.SetScrollZoom(
+                scrollZoomCurrentValue);
+    
+            scrollZoomValueLabel.Text =
+                $"Zoom: {scrollZoomCurrentValue:0}";
+        }
+        catch (Exception ex)
+        {
+            HandleFeatureError(
+                "SCROLL ZOOM",
+                ex);
+        }
+    }
+    
+    
+    // =========================================================
+    // SCROLL ZOOM - FREEZE
+    // =========================================================
+    
+    private void ScrollZoomFreezeCheck_CheckedChanged(
+        object? sender,
+        EventArgs e)
+    {
+        if (!scrollZoomInitializeCheck.Checked ||
+            features == null)
+        {
+            ResetCheckBox(
+                scrollZoomFreezeCheck,
+                false);
+    
+            scrollZoomFreezeTimer.Stop();
+            return;
+        }
+    
+        if (scrollZoomFreezeCheck.Checked)
+        {
+            try
+            {
+                scrollZoomCurrentValue =
+                    scrollZoomTrackBar.Value;
+    
+                features.SetScrollZoom(
+                    scrollZoomCurrentValue);
+    
+                scrollZoomFreezeTimer.Start();
+    
+                statusLabel.Text =
+                    "Status: Scroll Zoom Freeze ON";
+            }
+            catch (Exception ex)
+            {
+                scrollZoomFreezeTimer.Stop();
+    
+                HandleFeatureError(
+                    "SCROLL ZOOM FREEZE",
+                    ex);
+    
+                ResetCheckBox(
+                    scrollZoomFreezeCheck,
+                    false);
+            }
+        }
+        else
+        {
+            scrollZoomFreezeTimer.Stop();
+    
+            statusLabel.Text =
+                "Status: Scroll Zoom Freeze OFF";
+        }
+    }
+    
+    
+    // =========================================================
+    // SCROLL ZOOM - FREEZE TIMER
+    // =========================================================
+    
+    private void ScrollZoomFreezeTimer_Tick(
+        object? sender,
+        EventArgs e)
+    {
+        if (features == null ||
+            !scrollZoomInitializeCheck.Checked ||
+            !scrollZoomFreezeCheck.Checked)
+        {
+            scrollZoomFreezeTimer.Stop();
+            return;
+        }
+    
+        try
+        {
+            features.SetScrollZoom(
+                scrollZoomTrackBar.Value);
+        }
+        catch (Exception ex)
+        {
+            scrollZoomFreezeTimer.Stop();
+    
+            HandleFeatureError(
+                "SCROLL ZOOM FREEZE",
+                ex);
+    
+            ResetCheckBox(
+                scrollZoomFreezeCheck,
+                false);
+        }
+    }
     // =========================================================
     // TAB 4 - ZOOM / AUTO FOLLOW
     // =========================================================
