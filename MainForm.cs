@@ -5578,54 +5578,94 @@ public sealed class MainForm : Form
             }
         }
 
-        // =========================================================
-        // SET TAB 2 CHECKBOXES
-        // =========================================================
+
+    // =========================================================
+    // SET TAB 2 CHECKBOXES
+    // =========================================================
     
-        private void SetTab2Checks(
-            bool value)
+    private void SetTab2Checks(
+        bool value)
+    {
+        if (autoNpcCheck != null)
         {
-            if (autoNpcCheck != null)
-            {
-                ResetCheckBox(
-                    autoNpcCheck,
-                    value);
-            }
-    
-            if (stage2Check != null)
-            {
-                ResetCheckBox(
-                    stage2Check,
-                    value);
-            }
-    
-            if (combineInitializeCheck != null)
-            {
-                ResetCheckBox(
-                    combineInitializeCheck,
-                    false);
-            }
-    
-            if (combineCheck != null)
-            {
-                ResetCheckBox(
-                    combineCheck,
-                    false);
-    
-                combineCheck.Visible = false;
-                combineCheck.Enabled = false;
-            }
-    
-            SetNpcTargetControlsEnabled(
-                value &&
-                autoNpcCheck != null &&
-                autoNpcCheck.Checked);
-    
-            if (!value)
-            {
-                ResetNpcAddressLabels();
-            }
+            ResetCheckBox(
+                autoNpcCheck,
+                value);
         }
+    
+        if (stage2Check != null)
+        {
+            ResetCheckBox(
+                stage2Check,
+                value);
+        }
+    
+        if (combineInitializeCheck != null)
+        {
+            ResetCheckBox(
+                combineInitializeCheck,
+                false);
+        }
+    
+        if (combineCheck != null)
+        {
+            ResetCheckBox(
+                combineCheck,
+                false);
+    
+            combineCheck.Visible = false;
+            combineCheck.Enabled = false;
+        }
+    
+        // -----------------------------------------------------
+        // SCROLL ZOOM RESET
+        // -----------------------------------------------------
+    
+        if (scrollZoomInitializeCheck != null)
+        {
+            ResetCheckBox(
+                scrollZoomInitializeCheck,
+                false);
+        }
+    
+        if (scrollZoomFreezeCheck != null)
+        {
+            ResetCheckBox(
+                scrollZoomFreezeCheck,
+                false);
+    
+            scrollZoomFreezeCheck.Enabled = false;
+        }
+    
+        if (scrollZoomTrackBar != null)
+        {
+            scrollZoomTrackBar.Enabled = false;
+        }
+    
+        if (scrollZoomValueLabel != null)
+        {
+            scrollZoomValueLabel.Text =
+                "Zoom: Belum Initialize";
+        }
+    
+        scrollZoomFreezeTimer?.Stop();
+    
+        features?.ClearScrollZoom();
+    
+        scrollZoomCurrentValue = 0f;
+    
+        // -----------------------------------------------------
+    
+        SetNpcTargetControlsEnabled(
+            value &&
+            autoNpcCheck != null &&
+            autoNpcCheck.Checked);
+    
+        if (!value)
+        {
+            ResetNpcAddressLabels();
+        }
+    }
 
     // =========================================================
     // ATTACHED CHECK
