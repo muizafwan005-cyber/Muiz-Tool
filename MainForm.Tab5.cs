@@ -1,8 +1,7 @@
-
 using System;
 using System.Drawing;
 using System.Windows.Forms;
-
+using RFTool.AdvancedSystem;
 namespace RFTool;
 
 public sealed partial class MainForm
@@ -14,12 +13,12 @@ public sealed partial class MainForm
     private Panel advancedSidebar = null!;
     private Panel advancedContent = null!;
     private FlowLayoutPanel advancedMenu = null!;
-
+    private Panel advancedPageHost = null!;
     private Label advancedTitle = null!;
     private Label advancedDescription = null!;
-
+    
     private Button activeAdvancedButton = null!;
-
+    private readonly AddressManager addressManager = new();
     private readonly Color AdvancedSidebarColor =
         Color.FromArgb(30, 30, 35);
 
@@ -113,7 +112,16 @@ public sealed partial class MainForm
             BackColor = BackColorMain,
             Padding = new Padding(15)
         };
-
+        
+        advancedPageHost = new Panel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = BackColorMain
+        };
+        
+        advancedContent.Controls.Add(
+            advancedPageHost);
+        
         root.Controls.Add(
             advancedContent,
             1,
@@ -270,8 +278,27 @@ public sealed partial class MainForm
         string description)
     {
         advancedTitle.Text = title;
-
+    
         advancedDescription.Text =
             description;
+    
+        advancedPageHost.Controls.Clear();
+    
+        if (title == "Address Manager")
+        {
+            BuildAddressManagerPage();
+            return;
+        }
+    
+        var placeholder = new Label
+        {
+            Text = title + " - Coming Soon",
+            Dock = DockStyle.Fill,
+            ForeColor = ForeColorDim,
+            TextAlign = ContentAlignment.MiddleCenter
+        };
+    
+        advancedPageHost.Controls.Add(
+            placeholder);
     }
 }
