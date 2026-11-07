@@ -1548,8 +1548,17 @@ public sealed class MainForm : Form
     
         try
         {
-            scrollZoomCurrentValue =
-                scrollZoomTrackBar.Value;
+            int snappedValue =
+                (int)Math.Round(
+                    scrollZoomTrackBar.Value / 50.0) * 50;
+    
+            snappedValue = Math.Max(
+                0,
+                Math.Min(1500, snappedValue));
+    
+            scrollZoomTrackBar.Value = snappedValue;
+    
+            scrollZoomCurrentValue = snappedValue;
     
             features.SetScrollZoom(
                 scrollZoomCurrentValue);
