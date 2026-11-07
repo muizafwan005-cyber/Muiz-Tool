@@ -102,8 +102,143 @@ public sealed partial class MainForm
 
     // =========================================================
     // 3. BASE POINTER
-    // Kotak BASE POINTER di bagian atas aplikasi.
+    // Kotak BASE POINTER di bagian atas aplikasi, dikunci dengan password.
     // =========================================================
+
+    // -----------------------------------------------------
+    // KUNCI BASE POINTER
+    // Password tidak disimpan sebagai teks, hanya hash SHA-256.
+    // -----------------------------------------------------
+
+    private const string BasePointerSalt = "MuizTool.BasePointer.v1|";
+
+    private const string BasePointerPasswordHash =
+        "775499f6cce0264183e105cb85d729a3b419da2632dfd437040c8c4f07575672";
+
+    private bool basePointerUnlocked;
+
+    private static bool VerifyBasePointerPassword(string password)
+    {
+        byte[] actual =
+            System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(
+                    BasePointerSalt + password));
+
+        byte[] expected =
+            Convert.FromHexString(BasePointerPasswordHash);
+
+        return System.Security.Cryptography.CryptographicOperations
+            .FixedTimeEquals(actual, expected);
+    }
+
+    private void SetBasePointerLocked(bool locked)
+    {
+        basePointerUnlocked = !locked;
+
+        basePointerTextBox.ReadOnly = locked;
+        basePointerApplyButton.Enabled = !locked;
+        basePointerLockButton.Text = locked ? "UNLOCK" : "LOCK";
+    }
+
+    private void BasePointerLockButton_Click(
+        object? sender,
+        EventArgs e)
+    {
+        // Sedang terbuka -> kunci kembali.
+        if (basePointerUnlocked)
+        {
+            SetBasePointerLocked(true);
+            statusLabel.Text = "Status: Base Pointer dikunci";
+            return;
+        }
+
+        string? password = PromptBasePointerPassword();
+
+        if (password == null)
+            return;
+
+        if (VerifyBasePointerPassword(password))
+        {
+            SetBasePointerLocked(false);
+            statusLabel.Text = "Status: Base Pointer terbuka";
+            return;
+        }
+
+        MessageBox.Show(
+            this,
+            "Password salah.",
+            "Base Pointer",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Warning);
+    }
+
+    private string? PromptBasePointerPassword()
+    {
+        using var dialog = new Form
+        {
+            Text = "Buka kunci Base Pointer",
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MaximizeBox = false,
+            MinimizeBox = false,
+            ShowInTaskbar = false,
+            ClientSize = new Size(280, 104),
+            BackColor = BackColorMain,
+            ForeColor = ForeColorMain
+        };
+
+        var label = new Label
+        {
+            Text = "Masukkan password:",
+            AutoSize = true,
+            Location = new Point(12, 12)
+        };
+
+        var box = new TextBox
+        {
+            Location = new Point(12, 34),
+            Size = new Size(256, 25),
+            UseSystemPasswordChar = true,
+            BackColor = BackColorInput,
+            ForeColor = ForeColorMain,
+            BorderStyle = BorderStyle.FixedSingle
+        };
+
+        var ok = new Button
+        {
+            Text = "OK",
+            DialogResult = DialogResult.OK,
+            Location = new Point(112, 68),
+            Size = new Size(75, 27),
+            FlatStyle = FlatStyle.Flat,
+            BackColor = BackColorInput,
+            ForeColor = ForeColorMain
+        };
+
+        var cancel = new Button
+        {
+            Text = "BATAL",
+            DialogResult = DialogResult.Cancel,
+            Location = new Point(193, 68),
+            Size = new Size(75, 27),
+            FlatStyle = FlatStyle.Flat,
+            BackColor = BackColorInput,
+            ForeColor = ForeColorMain
+        };
+
+        ok.FlatAppearance.BorderSize = 0;
+        cancel.FlatAppearance.BorderSize = 0;
+
+        dialog.Controls.AddRange(
+            new Control[] { label, box, ok, cancel });
+
+        dialog.AcceptButton = ok;
+        dialog.CancelButton = cancel;
+
+        return dialog.ShowDialog(this) == DialogResult.OK
+            ? box.Text
+            : null;
+    }
 
     private bool TryParseBasePointerOffset(
         string input,
@@ -138,6 +273,12 @@ public sealed partial class MainForm
 
     private void ApplyBasePointer()
     {
+        if (!basePointerUnlocked)
+        {
+            statusLabel.Text = "Status: Base Pointer terkunci.";
+            return;
+        }
+
         if (features == null || memory == null || !IsAttached())
         {
             statusLabel.Text = "Status: Attach process terlebih dahulu.";
@@ -160,6 +301,9 @@ public sealed partial class MainForm
     
             statusLabel.Text =
                 $"Status: Base Pointer diterapkan → +{newOffset:X}";
+
+            // Kunci lagi setelah berhasil diterapkan.
+            SetBasePointerLocked(true);
     
         }
         catch (Exception ex)
