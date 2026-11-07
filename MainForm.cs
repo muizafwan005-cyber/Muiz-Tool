@@ -46,6 +46,7 @@ public sealed partial class MainForm : Form
     private Label statusLabel = null!;
     private TextBox basePointerTextBox = null!;
     private Button basePointerApplyButton = null!;
+    private Button basePointerLockButton = null!;
     private TabControl tabs = null!;
 
     // =========================================================
@@ -333,6 +334,25 @@ public sealed partial class MainForm : Form
         basePointerApplyButton.Click += (_, _) => ApplyBasePointer();
         
         topPanel.Controls.Add(basePointerApplyButton);
+
+        // Tombol kunci Base Pointer (butuh password untuk membuka).
+        basePointerLockButton = new Button
+        {
+            Text = "UNLOCK",
+            Location = new Point(260, 73),
+            Size = new Size(60, 27),
+            FlatStyle = FlatStyle.Flat,
+            BackColor = BackColorInput,
+            ForeColor = ForeColorMain
+        };
+
+        basePointerLockButton.FlatAppearance.BorderSize = 0;
+        basePointerLockButton.Click += BasePointerLockButton_Click;
+
+        topPanel.Controls.Add(basePointerLockButton);
+
+        // Saat aplikasi dibuka, Base Pointer selalu terkunci.
+        SetBasePointerLocked(true);
 
 
         // =====================================================
