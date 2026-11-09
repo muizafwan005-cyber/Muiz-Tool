@@ -32,6 +32,22 @@ public sealed partial class MainForm
 
     // Halaman yang sudah dibuat disimpan agar hasil scan tidak hilang saat pindah menu.
     private readonly Dictionary<string, Control> advancedPages = new();
+
+    // Tab ADVANCED dikunci password (sama dengan kunci Base Pointer).
+    private TabPage? advancedTab;
+    private bool advancedUnlocked;
+
+    private static readonly Dictionary<string, string> AdvancedDescriptions = new()
+    {
+        ["Memory Scanner"] = "Search and compare authorized memory data.",
+        ["Memory Viewer"] = "View memory data from permitted test processes.",
+        ["Address Manager"] = "Manage and organize saved address records.",
+        ["Pointer Analyzer"] = "Analyze pointer structures in test data.",
+        ["Pattern Analyzer"] = "Analyze byte patterns and signatures.",
+        ["Code Analyzer"] = "Inspect program instructions.",
+        ["Debug Tools"] = "Application diagnostics and debugging.",
+        ["Script Manager"] = "Manage automation scripts."
+    };
     private readonly Color AdvancedSidebarColor =
         Color.FromArgb(30, 30, 35);
 
@@ -44,6 +60,10 @@ public sealed partial class MainForm
 
     private void BuildTab5(TabPage tab)
     {
+        // Pasang kunci password: tab ini tidak bisa dibuka sebelum password benar.
+        advancedTab = tab;
+        tabs.Selecting += Tabs_Selecting;
+
         var root = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
@@ -339,11 +359,43 @@ public sealed partial class MainForm
             {
                 var scanner = new MemoryScannerPanel(AdvSvc.Target, addressManager);
                 scanner.BrowseRequested += BrowseInMemoryViewer;
+                scanner.DisassembleRequested += DisassembleInCodeAnalyzer;
+                scanner.PointerScanRequested += PointerScanFor;
                 return scanner;
             }
 
             case "Memory Viewer":
-                return new MemoryViewerPanel(AdvSvc.Target, addressManager);
+            {
+                var viewer = new MemoryViewerPanel(AdvSvc.Target, addressManager);
+                viewer.DisassembleRequested += DisassembleInCodeAnalyzer;
+                viewer.PointerScanRequested += PointerScanFor;
+                return viewer;
+            }
+
+            case "Pointer Analyzer":
+            {
+                var pointer = new PointerAnalyzerPanel(AdvSvc.Target, addressManager);
+                pointer.BrowseRequested += BrowseInMemoryViewer;
+                return pointer;
+            }
+
+            case "Pattern Analyzer":
+            {
+                var pattern = new PatternAnalyzerPanel(AdvSvc.Target, addressManager);
+                pattern.BrowseRequested += BrowseInMemoryViewer;
+                pattern.DisassembleRequested += DisassembleInCodeAnalyzer;
+                return pattern;
+            }
+
+            case "Code Analyzer":
+            {
+                var code = new CodeAnalyzerPanel(AdvSvc.Target, addressManager);
+                code.BrowseRequested += BrowseInMemoryViewer;
+                return code;
+            }
+
+            case "Script Manager":
+                return new ScriptManagerPanel(AdvSvc);
 
             case "Debug Tools":
                 return new DebugToolsPanel(AdvSvc.Target);
@@ -416,5 +468,103 @@ public sealed partial class MainForm
 
         advanced?.Dispose();
         advanced = null;
+    }
+
+    // =========================================================
+    // KUNCI PASSWORD TAB ADVANCED
+    // =========================================================
+
+    private void Tabs_Selecting(object? sender, TabControlCancelEventArgs e)
+    {
+        if (e.TabPage != advancedTab || advancedUnlocked)
+            return;
+
+        string? password = PromptBasePointerPassword("Buka tab ADVANCED");
+
+        if (password == null)
+        {
+            e.Cancel = true;
+            return;
+        }
+
+        if (VerifyBasePointerPassword(password))
+        {
+            advancedUnlocked = true;
+            statusLabel.Text = "Status: Tab ADVANCED terbuka";
+            return;
+        }
+
+        e.Cancel = true;
+
+        MessageBox.Show(
+            this,
+            "Password salah.",
+            "ADVANCED",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Warning);
+    }
+
+    // =========================================================
+    // NAVIGASI ANTAR HALAMAN ADVANCED
+    // =========================================================
+
+    private void OpenAdvancedPage(string title)
+    {
+        ShowAdvancedPage(title, AdvancedDescriptions[title]);
+
+        foreach (Control control in advancedMenu.Controls)
+        {
+            if (control is Button button && button.Text == title)
+                SetAdvancedActiveButton(button);
+        }
+    }
+
+    private bool ResolveAdvancedAddress(string text, out ulong address)
+    {
+        address = 0;
+
+        TargetProcess? target = AdvSvc.Target.Get();
+
+        if (target == null)
+        {
+            MessageBox.Show("Attach process terlebih dahulu.");
+            return false;
+        }
+
+        if (!AddressExpression.TryEvaluate(target, text, out address, out string error))
+        {
+            MessageBox.Show(error, "Address tidak valid");
+            return false;
+        }
+
+        return true;
+    }
+
+    private void DisassembleInCodeAnalyzer(string addressText)
+    {
+        if (!ResolveAdvancedAddress(addressText, out ulong address))
+            return;
+
+        OpenAdvancedPage("Code Analyzer");
+
+        if (advancedPages.TryGetValue("Code Analyzer", out Control? page) &&
+            page is CodeAnalyzerPanel analyzer)
+        {
+            analyzer.GoToAddress(address);
+        }
+    }
+
+    private void PointerScanFor(string addressText)
+    {
+        if (!ResolveAdvancedAddress(addressText, out ulong address))
+            return;
+
+        OpenAdvancedPage("Pointer Analyzer");
+
+        if (advancedPages.TryGetValue("Pointer Analyzer", out Control? page) &&
+            page is PointerAnalyzerPanel pointer)
+        {
+            pointer.SetTarget(address.ToString("X"));
+        }
     }
 }
