@@ -32,6 +32,7 @@ internal sealed class AdvancedServices : IDisposable
 
         Freeze.Refresh();
         Target.Invalidate();
+        SymbolTable.Clear();
     }
 
     public void Dispose()
