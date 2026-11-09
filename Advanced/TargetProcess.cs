@@ -311,6 +311,94 @@ internal sealed class TargetProcess : IDisposable
     }
 
     // ---------------------------------------------------------
+    // ALOKASI MEMORI (dipakai Auto Assemble: alloc / dealloc)
+    // ---------------------------------------------------------
+
+    /// <summary>
+    /// Mengalokasikan memori RWX di process target. Pada target 64-bit mencoba mencari
+    /// area bebas dalam jangkauan +-2GB dari 'near' agar jmp rel32 bisa menjangkaunya.
+    /// Mengembalikan 0 jika gagal.
+    /// </summary>
+    public ulong Allocate(int size, ulong near)
+    {
+        size = Math.Max(size, 0x1000);
+        uint type = NativeApi.MEM_COMMIT | NativeApi.MEM_RESERVE;
+
+        if (!Is32Bit && near != 0)
+        {
+            ulong low = near > 0x7FFF0000UL ? near - 0x7FFF0000UL : 0x10000UL;
+            ulong high = Math.Min(MaxAddress, near + 0x7FFF0000UL);
+            ulong best = 0;
+            ulong bestDistance = ulong.MaxValue;
+            ulong address = low;
+
+            while (address < high)
+            {
+                if (!QueryRegion(address, out MemRegion r))
+                    break;
+
+                if (r.State == NativeApi.MEM_FREE)
+                {
+                    ulong start = (r.Base + 0xFFFFUL) & ~0xFFFFUL;
+                    ulong candidate = near & ~0xFFFFUL;
+
+                    if (candidate < start)
+                        candidate = start;
+
+                    if (candidate + (ulong)size > r.End)
+                    {
+                        ulong tail = r.End >= (ulong)size ? (r.End - (ulong)size) & ~0xFFFFUL : 0;
+                        candidate = tail;
+                    }
+
+                    if (candidate >= start && candidate + (ulong)size <= r.End)
+                    {
+                        ulong distance = candidate > near ? candidate - near : near - candidate;
+
+                        if (distance < bestDistance)
+                        {
+                            bestDistance = distance;
+                            best = candidate;
+                        }
+                    }
+                }
+
+                ulong next = r.Base + r.Size;
+
+                if (next <= address)
+                    break;
+
+                address = next;
+            }
+
+            if (best != 0)
+            {
+                UIntPtr p = NativeApi.VirtualAllocEx(
+                    handle, new UIntPtr(best), new UIntPtr((uint)size), type, NativeApi.PAGE_EXECUTE_READWRITE);
+
+                if (p != UIntPtr.Zero)
+                    return (ulong)p;
+            }
+        }
+
+        UIntPtr any = NativeApi.VirtualAllocEx(
+            handle, UIntPtr.Zero, new UIntPtr((uint)size), type, NativeApi.PAGE_EXECUTE_READWRITE);
+
+        if (any == UIntPtr.Zero)
+            LastError = Marshal.GetLastWin32Error();
+
+        return (ulong)any;
+    }
+
+    public bool Free(ulong address)
+    {
+        if (address > (ulong)UIntPtr.MaxValue)
+            return false;
+
+        return NativeApi.VirtualFreeEx(handle, new UIntPtr(address), UIntPtr.Zero, NativeApi.MEM_RELEASE);
+    }
+
+    // ---------------------------------------------------------
     // REGION
     // ---------------------------------------------------------
 
