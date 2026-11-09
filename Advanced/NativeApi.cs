@@ -17,6 +17,7 @@ internal static class NativeApi
     public const uint MEM_PRIVATE = 0x20000;
     public const uint MEM_MAPPED = 0x40000;
     public const uint MEM_IMAGE = 0x1000000;
+    public const uint MEM_RELEASE = 0x8000;
 
     public const uint PAGE_NOACCESS = 0x01;
     public const uint PAGE_READONLY = 0x02;
@@ -61,6 +62,14 @@ internal static class NativeApi
     [DllImport("kernel32.dll", SetLastError = true)]
     public static extern bool VirtualProtectEx(
         IntPtr process, UIntPtr address, UIntPtr size, uint newProtect, out uint oldProtect);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern UIntPtr VirtualAllocEx(
+        IntPtr process, UIntPtr address, UIntPtr size, uint allocationType, uint protect);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool VirtualFreeEx(
+        IntPtr process, UIntPtr address, UIntPtr size, uint freeType);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     public static extern bool IsWow64Process(IntPtr process, out bool wow64);
