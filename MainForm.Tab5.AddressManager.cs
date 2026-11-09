@@ -758,13 +758,15 @@ public sealed partial class MainForm
             Keys.Control | Keys.B,
             true));
 
-        ToolStripMenuItem disassemble = AdvTheme.Item(
-            "Disassemble this memory region (Code Analyzer - segera)",
-            () => { },
-            Keys.Control | Keys.D);
+        menu.Items.Add(AdvTheme.Item(
+            "Disassemble this memory region",
+            DisassembleSelectedAddress,
+            Keys.Control | Keys.D));
 
-        disassemble.Enabled = false;
-        menu.Items.Add(disassemble);
+        menu.Items.Add(AdvTheme.Item(
+            "Pointer scan for this address",
+            PointerScanSelectedAddress,
+            Keys.Control | Keys.P));
 
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(AdvTheme.Item("Write value now", WriteSelectedAddress));
@@ -786,5 +788,31 @@ public sealed partial class MainForm
             addressGrid.CurrentCell =
                 addressGrid.Rows[e.RowIndex].Cells[Math.Max(0, e.ColumnIndex)];
         };
+    }
+
+    private void DisassembleSelectedAddress()
+    {
+        AddressEntry? entry = SelectedAddressEntry();
+
+        if (entry == null)
+        {
+            MessageBox.Show("Pilih alamat terlebih dahulu.");
+            return;
+        }
+
+        DisassembleInCodeAnalyzer(entry.Address);
+    }
+
+    private void PointerScanSelectedAddress()
+    {
+        AddressEntry? entry = SelectedAddressEntry();
+
+        if (entry == null)
+        {
+            MessageBox.Show("Pilih alamat terlebih dahulu.");
+            return;
+        }
+
+        PointerScanFor(entry.Address);
     }
 }
