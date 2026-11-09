@@ -172,11 +172,11 @@ public sealed partial class MainForm
             MessageBoxIcon.Warning);
     }
 
-    private string? PromptBasePointerPassword()
+    private string? PromptBasePointerPassword(string title = "Buka kunci Base Pointer")
     {
         using var dialog = new Form
         {
-            Text = "Buka kunci Base Pointer",
+            Text = title,
             StartPosition = FormStartPosition.CenterParent,
             FormBorderStyle = FormBorderStyle.FixedDialog,
             MaximizeBox = false,
