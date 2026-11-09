@@ -341,6 +341,12 @@ internal sealed class MemoryViewerPanel : UserControl
     private readonly Button findBtn;
     private readonly System.Windows.Forms.Timer timer;
 
+    /// <summary>Diminta membuka Code Analyzer di alamat ini (hex).</summary>
+    public event Action<string>? DisassembleRequested;
+
+    /// <summary>Diminta membuka Pointer Analyzer dengan target alamat ini (hex).</summary>
+    public event Action<string>? PointerScanRequested;
+
     private CancellationTokenSource? searchCts;
     private bool searching;
 
@@ -763,10 +769,15 @@ internal sealed class MemoryViewerPanel : UserControl
         menu.Items.Add(AdvTheme.Item("Refresh", () => { hex.Reload(); UpdateInfo(); }, Keys.F5));
         menu.Items.Add(new ToolStripSeparator());
 
-        ToolStripMenuItem disassemble = AdvTheme.Item(
-            "Disassemble this memory region (Code Analyzer - segera)", () => { }, Keys.Control | Keys.D);
-        disassemble.Enabled = false;
-        menu.Items.Add(disassemble);
+        menu.Items.Add(AdvTheme.Item(
+            "Disassemble this memory region",
+            () => DisassembleRequested?.Invoke(hex.Selected.ToString("X")),
+            Keys.Control | Keys.D));
+
+        menu.Items.Add(AdvTheme.Item(
+            "Pointer scan for this address",
+            () => PointerScanRequested?.Invoke(hex.Selected.ToString("X")),
+            Keys.Control | Keys.P));
 
         hex.ContextMenuStrip = menu;
     }
