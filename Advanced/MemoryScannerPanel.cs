@@ -47,6 +47,12 @@ internal sealed class MemoryScannerPanel : UserControl
     /// <summary>Diminta membuka Memory Viewer di alamat ini (hex).</summary>
     public event Action<string>? BrowseRequested;
 
+    /// <summary>Diminta membuka Code Analyzer di alamat ini (hex).</summary>
+    public event Action<string>? DisassembleRequested;
+
+    /// <summary>Diminta membuka Pointer Analyzer dengan target alamat ini (hex).</summary>
+    public event Action<string>? PointerScanRequested;
+
     public MemoryScannerPanel(TargetProvider provider, AddressManager manager)
     {
         this.provider = provider;
@@ -648,10 +654,8 @@ internal sealed class MemoryScannerPanel : UserControl
         menu.Items.Add(AdvTheme.Item("Change value of selected addresses back to previous value", RestorePreviousSelected, Keys.Control | Keys.Alt | Keys.E));
         menu.Items.Add(AdvTheme.Item("Browse this memory region", BrowseSelected, Keys.Control | Keys.B));
 
-        ToolStripMenuItem disassemble = AdvTheme.Item(
-            "Disassemble this memory region (Code Analyzer - segera)", () => { }, Keys.Control | Keys.D);
-        disassemble.Enabled = false;
-        menu.Items.Add(disassemble);
+        menu.Items.Add(AdvTheme.Item("Disassemble this memory region", DisassembleSelected, Keys.Control | Keys.D));
+        menu.Items.Add(AdvTheme.Item("Pointer scan for this address", PointerScanSelected, Keys.Control | Keys.P));
 
         menu.Items.Add(AdvTheme.Item("Remove selected address", RemoveSelected, Keys.Control | Keys.Delete));
         menu.Items.Add(AdvTheme.Item("Copy selected addresses", CopySelected, Keys.Control | Keys.C));
@@ -824,5 +828,31 @@ internal sealed class MemoryScannerPanel : UserControl
         {
             Status("Gagal menyalin: " + ex.Message);
         }
+    }
+
+    private void DisassembleSelected()
+    {
+        List<int> selected = SelectedIndexList();
+
+        if (selected.Count == 0)
+        {
+            Status("Pilih alamat hasil scan dulu.");
+            return;
+        }
+
+        DisassembleRequested?.Invoke(scanner.AddressAt(selected[0]).ToString("X"));
+    }
+
+    private void PointerScanSelected()
+    {
+        List<int> selected = SelectedIndexList();
+
+        if (selected.Count == 0)
+        {
+            Status("Pilih alamat hasil scan dulu.");
+            return;
+        }
+
+        PointerScanRequested?.Invoke(scanner.AddressAt(selected[0]).ToString("X"));
     }
 }
