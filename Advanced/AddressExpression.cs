@@ -187,12 +187,18 @@ internal static class AddressExpression
             if (ulong.TryParse(hex, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out ulong number))
                 return number;
 
+            if (vars != null && vars.TryGetValue(token, out ulong localSymbol))
+                return localSymbol;
+
+            if (SymbolTable.TryGet(token, out ulong registered))
+                return registered;
+
             ulong moduleBase = target.GetModuleBase(token);
 
             if (moduleBase != 0)
                 return moduleBase;
 
-            throw new ExpressionException("'" + token + "' bukan module yang dimuat atau angka hex.");
+            throw new ExpressionException("'" + token + "' bukan simbol, module yang dimuat, atau angka hex.");
         }
     }
 }
