@@ -418,6 +418,7 @@ internal sealed class LuaAdvance
                 Description = description,
                 Address = address,
                 ValueType = type,
+                Signed = ValueCodec.DefaultSigned(ValueCodec.TypeFromName(type)),
                 Value = value,
                 Group = group
             }));
