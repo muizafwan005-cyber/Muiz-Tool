@@ -345,6 +345,7 @@ internal sealed class PointerAnalyzerPanel : UserControl
                 Description = "Pointer " + p.BaseText,
                 Address = p.Expression,
                 ValueType = typeName,
+                Signed = ValueCodec.DefaultSigned(ValueCodec.TypeFromName(typeName)),
                 Value = "0",
                 Group = "Pointer"
             };
