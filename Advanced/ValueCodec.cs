@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 
@@ -13,15 +14,34 @@ internal enum ScanValueType
     Int64,
     Float,
     Double,
-    String
+    String,
+    ByteArray
 }
 
 internal static class ValueCodec
 {
     public static readonly string[] TypeNames =
     {
+        "Byte", "2 Bytes", "4 Bytes", "8 Bytes", "Float", "Double", "String", "Array of byte"
+    };
+
+    /// <summary>Tipe yang bisa dipakai di Memory Scanner (tanpa Array of byte).</summary>
+    public static readonly string[] ScannableTypeNames =
+    {
         "Byte", "2 Bytes", "4 Bytes", "8 Bytes", "Float", "Double", "String"
     };
+
+    public static bool IsInteger(ScanValueType type)
+    {
+        return type == ScanValueType.Byte || type == ScanValueType.Int16 ||
+               type == ScanValueType.Int32 || type == ScanValueType.Int64;
+    }
+
+    /// <summary>Default tampilan bertanda: 2/4/8 Bytes bertanda, Byte tidak.</summary>
+    public static bool DefaultSigned(ScanValueType type)
+    {
+        return type == ScanValueType.Int16 || type == ScanValueType.Int32 || type == ScanValueType.Int64;
+    }
 
     /// <summary>Mengubah teks tipe ("4 Bytes", "Float", dst) menjadi enum. Default 4 Bytes.</summary>
     public static ScanValueType TypeFromName(string? name)
@@ -123,6 +143,44 @@ internal static class ValueCodec
             return true;
         }
 
+        if (type == ScanValueType.ByteArray)
+        {
+            var list = new List<byte>();
+
+            foreach (string token in text.Split(
+                         new[] { ' ', ',', '\t', '\r', '\n' },
+                         StringSplitOptions.RemoveEmptyEntries))
+            {
+                string hexText = token.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
+                    ? token.Substring(2)
+                    : token;
+
+                if (hexText.Length == 0 || hexText.Length > 2 ||
+                    !byte.TryParse(hexText, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out byte b))
+                {
+                    error = "Byte '" + token + "' bukan hex 00-FF.";
+                    return false;
+                }
+
+                list.Add(b);
+            }
+
+            if (list.Count == 0)
+            {
+                error = "Isi minimal satu byte hex, contoh: 90 90 90.";
+                return false;
+            }
+
+            if (list.Count > 4096)
+            {
+                error = "Array of byte maksimal 4096 byte.";
+                return false;
+            }
+
+            bytes = list.ToArray();
+            return true;
+        }
+
         string s = text.Trim();
 
         if (s.Length == 0)
@@ -199,23 +257,50 @@ internal static class ValueCodec
         }
     }
 
-    public static string Format(ReadOnlySpan<byte> b, ScanValueType type, bool unicode = false)
+    /// <summary>
+    /// signed: null = bawaan (Byte tanpa tanda, 2/4/8 Bytes bertanda); true/false memaksa.
+    /// hex: tampilkan bilangan bulat sebagai heksadesimal.
+    /// </summary>
+    public static string Format(
+        ReadOnlySpan<byte> b,
+        ScanValueType type,
+        bool unicode = false,
+        bool? signed = null,
+        bool hex = false)
     {
         try
         {
+            if (hex && IsInteger(type))
+            {
+                ulong v = 0;
+
+                for (int i = 0; i < b.Length && i < 8; i++)
+                    v |= (ulong)b[i] << (8 * i);
+
+                return v.ToString("X" + (Size(type) * 2), CultureInfo.InvariantCulture);
+            }
+
             switch (type)
             {
                 case ScanValueType.Byte:
-                    return b[0].ToString(CultureInfo.InvariantCulture);
+                    return signed == true
+                        ? ((sbyte)b[0]).ToString(CultureInfo.InvariantCulture)
+                        : b[0].ToString(CultureInfo.InvariantCulture);
 
                 case ScanValueType.Int16:
-                    return BitConverter.ToInt16(b).ToString(CultureInfo.InvariantCulture);
+                    return signed == false
+                        ? BitConverter.ToUInt16(b).ToString(CultureInfo.InvariantCulture)
+                        : BitConverter.ToInt16(b).ToString(CultureInfo.InvariantCulture);
 
                 case ScanValueType.Int32:
-                    return BitConverter.ToInt32(b).ToString(CultureInfo.InvariantCulture);
+                    return signed == false
+                        ? BitConverter.ToUInt32(b).ToString(CultureInfo.InvariantCulture)
+                        : BitConverter.ToInt32(b).ToString(CultureInfo.InvariantCulture);
 
                 case ScanValueType.Int64:
-                    return BitConverter.ToInt64(b).ToString(CultureInfo.InvariantCulture);
+                    return signed == false
+                        ? BitConverter.ToUInt64(b).ToString(CultureInfo.InvariantCulture)
+                        : BitConverter.ToInt64(b).ToString(CultureInfo.InvariantCulture);
 
                 case ScanValueType.Float:
                     return BitConverter.ToSingle(b).ToString(CultureInfo.InvariantCulture);
@@ -223,10 +308,13 @@ internal static class ValueCodec
                 case ScanValueType.Double:
                     return BitConverter.ToDouble(b).ToString(CultureInfo.InvariantCulture);
 
+                case ScanValueType.ByteArray:
+                    return BitConverter.ToString(b.ToArray()).Replace('-', ' ');
+
                 default:
-                    string s = unicode ? Encoding.Unicode.GetString(b) : Encoding.Latin1.GetString(b);
-                    int nul = s.IndexOf('\0');
-                    return nul >= 0 ? s.Substring(0, nul) : s;
+                    string text = unicode ? Encoding.Unicode.GetString(b) : Encoding.Latin1.GetString(b);
+                    int nul = text.IndexOf('\0');
+                    return nul >= 0 ? text.Substring(0, nul) : text;
             }
         }
         catch
@@ -267,6 +355,9 @@ internal static class ValueCodec
     {
         if (type == ScanValueType.String)
             return unicode ? 2 : 1;
+
+        if (type == ScanValueType.ByteArray)
+            return 1;
 
         return Size(type);
     }
