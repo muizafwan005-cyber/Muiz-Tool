@@ -122,7 +122,7 @@ internal sealed class MemoryScannerPanel : UserControl
 
         y += 34;
         right.Controls.Add(AdvTheme.Lbl("Value Type").At(8, y + 4));
-        valueTypeCombo = AdvTheme.Cmb(150, ValueCodec.TypeNames);
+        valueTypeCombo = AdvTheme.Cmb(150, ValueCodec.ScannableTypeNames);
         valueTypeCombo.SelectedIndex = (int)ScanValueType.Int32;
         valueTypeCombo.Location = new Point(80, y);
         unicodeCheck = AdvTheme.Chk("Unicode").At(238, y + 2);
@@ -610,6 +610,7 @@ internal sealed class MemoryScannerPanel : UserControl
                 Description = "No description",
                 Address = t.Describe(address),
                 ValueType = ValueCodec.Name(scanner.Type),
+                Signed = ValueCodec.DefaultSigned(scanner.Type),
                 Value = ReadCurrentText(t, address),
                 Group = "Default"
             });
