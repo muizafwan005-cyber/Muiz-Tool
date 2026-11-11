@@ -463,6 +463,7 @@ internal sealed class PatternAnalyzerPanel : UserControl
                 Description = "Pattern " + (nameBox.Text.Length > 0 ? nameBox.Text : "hasil"),
                 Address = t.Describe(address),
                 ValueType = "4 Bytes",
+                Signed = true,
                 Value = "0",
                 Group = groupBox.Text.Length > 0 ? groupBox.Text : "Default"
             };
