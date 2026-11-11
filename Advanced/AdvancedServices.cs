@@ -54,10 +54,10 @@ internal static class EntryIO
     {
         ScanValueType type = ValueCodec.TypeFromName(e.ValueType);
 
-        if (type != ScanValueType.String)
+        if (type != ScanValueType.String && type != ScanValueType.ByteArray)
             return ValueCodec.Size(type);
 
-        return ValueCodec.TryParse(e.Value, type, false, false, out byte[] b, out _) ? b.Length : 16;
+        return ValueCodec.TryParse(e.Value, type, e.Hex, false, out byte[] b, out _) ? b.Length : 16;
     }
 
     public static bool TryWrite(TargetProvider provider, AddressEntry e, out string message)
@@ -72,7 +72,7 @@ internal static class EntryIO
 
         ScanValueType type = ValueCodec.TypeFromName(e.ValueType);
 
-        if (!ValueCodec.TryParse(e.Value, type, false, false, out byte[] data, out string parseError))
+        if (!ValueCodec.TryParse(e.Value, type, e.Hex, false, out byte[] data, out string parseError))
         {
             message = parseError;
             return false;
@@ -119,7 +119,7 @@ internal static class EntryIO
             return false;
         }
 
-        text = ValueCodec.Format(data, ValueCodec.TypeFromName(e.ValueType));
+        text = ValueCodec.Format(data, ValueCodec.TypeFromName(e.ValueType), false, e.Signed, e.Hex);
         message = "0x" + t.FormatAddress(address);
         return true;
     }
@@ -167,7 +167,7 @@ internal sealed class FreezeService : IDisposable
 
             ScanValueType type = ValueCodec.TypeFromName(e.ValueType);
 
-            if (!ValueCodec.TryParse(e.Value, type, false, false, out byte[] data, out string err))
+            if (!ValueCodec.TryParse(e.Value, type, e.Hex, false, out byte[] data, out string err))
             {
                 SetStatus(e, "Value tidak valid: " + err);
                 continue;
