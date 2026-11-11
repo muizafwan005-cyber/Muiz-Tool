@@ -1,4 +1,3 @@
-
 using System;
 using System.Drawing;
 using System.IO;
@@ -361,177 +360,28 @@ public sealed partial class MainForm
     private AddressEntry? ShowAddressEditor(
         AddressEntry? existing)
     {
-        using var dialog = new Form
+        var draft = new AddressEntry
         {
-            Text = existing == null
-                ? "Add Address"
-                : "Edit Address",
-
-            Size = new Size(400, 370),
-            StartPosition = FormStartPosition.CenterParent,
-            FormBorderStyle = FormBorderStyle.FixedDialog,
-            MaximizeBox = false,
-            MinimizeBox = false,
-            BackColor = Color.FromArgb(30, 30, 35),
-            ForeColor = Color.White
+            Description = existing?.Description ?? "No description",
+            Address = existing?.Address ?? "",
+            ValueType = existing?.ValueType ?? "4 Bytes",
+            Value = existing?.Value ?? "0",
+            Group = existing?.Group ?? "Default",
+            Hex = existing?.Hex ?? false,
+            Signed = existing?.Signed ?? true
         };
 
-        Label CreateLabel(string text, int y)
+        if (!ChangeAddressDialog.Edit(
+                this,
+                existing == null ? "Add address" : "Change address",
+                draft,
+                AdvSvc.Target))
         {
-            return new Label
-            {
-                Text = text,
-                Location = new Point(15, y + 4),
-                Size = new Size(100, 22),
-                ForeColor = Color.White
-            };
-        }
-
-        TextBox CreateTextBox(string value, int y)
-        {
-            return new TextBox
-            {
-                Text = value,
-                Location = new Point(120, y),
-                Size = new Size(245, 24)
-            };
-        }
-
-        dialog.Controls.Add(CreateLabel("Description", 20));
-
-        var descriptionBox = CreateTextBox(
-            existing?.Description ?? "",
-            20);
-
-        dialog.Controls.Add(descriptionBox);
-
-        dialog.Controls.Add(CreateLabel("Address", 60));
-
-        var addressBox = CreateTextBox(
-            existing?.Address ?? "",
-            60);
-
-        dialog.Controls.Add(addressBox);
-
-        dialog.Controls.Add(CreateLabel("Value Type", 100));
-
-        var typeBox = new ComboBox
-        {
-            Location = new Point(120, 100),
-            Size = new Size(245, 24),
-            DropDownStyle = ComboBoxStyle.DropDownList
-        };
-
-        typeBox.Items.AddRange(ValueCodec.TypeNames);
-
-        typeBox.SelectedItem =
-            existing?.ValueType ?? "4 Bytes";
-
-        if (typeBox.SelectedIndex < 0)
-            typeBox.SelectedIndex = 2;
-
-        dialog.Controls.Add(typeBox);
-
-        dialog.Controls.Add(CreateLabel("Value", 140));
-        
-        var valueBox = CreateTextBox(
-            existing?.Value ?? "0",
-            140);
-        
-        dialog.Controls.Add(valueBox);
-        
-        dialog.Controls.Add(CreateLabel("Group", 180));
-        
-        var groupBox = CreateTextBox(
-            existing?.Group ?? "Default",
-            180);
-        
-        dialog.Controls.Add(groupBox);
-        
-        var saveButton = new Button
-        {
-            Text = "SAVE",
-            Location = new Point(190, 250),
-            Size = new Size(80, 32),
-            DialogResult = DialogResult.OK
-        };
-
-        var cancelButton = new Button
-        {
-            Text = "CANCEL",
-            Location = new Point(280, 250),
-            Size = new Size(80, 32),
-            DialogResult = DialogResult.Cancel
-        };
-
-        dialog.Controls.Add(saveButton);
-        dialog.Controls.Add(cancelButton);
-
-        dialog.AcceptButton = saveButton;
-        dialog.CancelButton = cancelButton;
-
-        if (dialog.ShowDialog(this) != DialogResult.OK)
-            return null;
-
-        if (string.IsNullOrWhiteSpace(
-            descriptionBox.Text))
-        {
-            MessageBox.Show("Description wajib diisi.");
             return null;
         }
 
-        if (string.IsNullOrWhiteSpace(addressBox.Text))
-        {
-            MessageBox.Show("Address wajib diisi.");
-            return null;
-        }
-
-        ScanValueType chosenType =
-            ValueCodec.TypeFromName(typeBox.Text);
-
-        if (valueBox.Text.Trim().Length > 0 &&
-            !ValueCodec.TryParse(
-                valueBox.Text,
-                chosenType,
-                false,
-                false,
-                out _,
-                out string valueError))
-        {
-            MessageBox.Show(
-                valueError,
-                "Value tidak valid");
-
-            return null;
-        }
-
-        TargetProcess? attachedTarget = AdvSvc.Target.Get();
-
-        if (attachedTarget != null &&
-            !AddressExpression.TryEvaluate(
-                attachedTarget,
-                addressBox.Text,
-                out _,
-                out string addressError))
-        {
-            MessageBox.Show(
-                addressError,
-                "Address tidak valid");
-
-            return null;
-        }
-
-        return new AddressEntry
-        {
-            Description = descriptionBox.Text.Trim(),
-            Address = addressBox.Text.Trim(),
-            ValueType = typeBox.Text,
-            Value = valueBox.Text.Trim(),
-            Group = string.IsNullOrWhiteSpace(groupBox.Text)
-                ? "Default"
-                : groupBox.Text.Trim(),
-            Freeze = existing?.Freeze ?? false
-        };
+        draft.Freeze = existing?.Freeze ?? false;
+        return draft;
     }
 
     // =========================================================
@@ -643,7 +493,7 @@ public sealed partial class MainForm
         if (!ValueCodec.TryParse(
                 entry.Value,
                 type,
-                false,
+                entry.Hex,
                 false,
                 out _,
                 out string parseError))
