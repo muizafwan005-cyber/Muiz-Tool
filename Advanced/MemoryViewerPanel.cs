@@ -23,7 +23,8 @@ internal sealed class HexView : Control
 
     private byte[] data = Array.Empty<byte>();
     private bool[] valid = Array.Empty<bool>();
-    private bool[] changed = Array.Empty<bool>();
+    private byte[] heat = Array.Empty<byte>();
+    private const byte HeatTicks = 8;
 
     public ulong BaseAddress { get; private set; }
     public ulong Selected { get; private set; }
@@ -67,7 +68,7 @@ internal sealed class HexView : Control
     {
         BaseAddress = address & ~0xFUL;
         Selected = address;
-        changed = Array.Empty<bool>();
+        heat = Array.Empty<byte>();
         Reload();
         SelectionChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -109,16 +110,19 @@ internal sealed class HexView : Control
             }
         }
 
-        if (changed.Length != n)
-            changed = new bool[n];
+        // Byte yang berubah ditandai merah lalu memudar dalam beberapa siklus refresh.
+        if (heat.Length != n)
+            heat = new byte[n];
 
-        if (data.Length == n)
+        bool sameView = data.Length == n && valid.Length == n;
+
+        for (int i = 0; i < n; i++)
         {
-            for (int i = 0; i < n; i++)
-            {
-                if (ok[i] && valid.Length == n && valid[i] && data[i] != nd[i])
-                    changed[i] = true;
-            }
+            if (heat[i] > 0)
+                heat[i]--;
+
+            if (sameView && ok[i] && valid[i] && data[i] != nd[i])
+                heat[i] = HeatTicks;
         }
 
         data = nd;
@@ -185,7 +189,7 @@ internal sealed class HexView : Control
 
                 Color color = !ok
                     ? AdvTheme.Dim
-                    : (idx < changed.Length && changed[idx] ? Color.FromArgb(255, 90, 90) : Color.FromArgb(120, 220, 140));
+                    : (idx < heat.Length && heat[idx] > 0 ? Color.FromArgb(255, 90, 90) : Color.FromArgb(120, 220, 140));
 
                 string hex = ok ? data[idx].ToString("X2", CultureInfo.InvariantCulture) : "??";
                 char ch = ok && data[idx] >= 32 && data[idx] < 127 ? (char)data[idx] : '.';
@@ -275,7 +279,7 @@ internal sealed class HexView : Control
             Selected += (ulong)delta;
         }
 
-        changed = Array.Empty<bool>();
+        heat = Array.Empty<byte>();
         Reload();
         SelectionChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -297,7 +301,7 @@ internal sealed class HexView : Control
         if (Selected < BaseAddress)
         {
             BaseAddress = Selected & ~0xFUL;
-            changed = Array.Empty<bool>();
+            heat = Array.Empty<byte>();
             Reload();
         }
         else if (Selected >= BaseAddress + (ulong)(rows * Cols))
@@ -305,7 +309,7 @@ internal sealed class HexView : Control
             ulong rowStart = Selected & ~0xFUL;
             ulong back = (ulong)((rows - 1) * Cols);
             BaseAddress = rowStart >= back ? rowStart - back : 0;
-            changed = Array.Empty<bool>();
+            heat = Array.Empty<byte>();
             Reload();
         }
         else
@@ -376,7 +380,7 @@ internal sealed class MemoryViewerPanel : UserControl
         Button nextBtn = AdvTheme.Btn("Page >", 56);
         Button refreshBtn = AdvTheme.Btn("Refresh", 64);
         Button addListBtn = AdvTheme.Btn("Add to List", 84);
-        autoCheck = AdvTheme.Chk("Auto");
+        autoCheck = AdvTheme.Chk("Auto", true);
         autoCheck.Margin = new Padding(6, 5, 0, 0);
 
         top.Controls.Add(addressBox);
@@ -455,7 +459,7 @@ internal sealed class MemoryViewerPanel : UserControl
         writeBtn.Click += (s, e) => WriteBytes();
         hex.SelectionChanged += (s, e) => UpdateInfo();
 
-        timer = new System.Windows.Forms.Timer { Interval = 500 };
+        timer = new System.Windows.Forms.Timer { Interval = 250 };
         timer.Tick += (s, e) =>
         {
             if (autoCheck.Checked && Parent != null && Visible && !searching)
@@ -715,14 +719,43 @@ internal sealed class MemoryViewerPanel : UserControl
         }
 
         ulong address = hex.Selected;
-        byte[]? data = t.ReadBytes(address, ValueCodec.Size(type));
-        string value = data != null ? ValueCodec.Format(data, type) : "0";
+        string value;
+
+        if (type == ScanValueType.String)
+        {
+            // Baca sampai 64 byte atau sampai karakter NUL pertama.
+            byte[] buffer = new byte[64];
+            t.TryRead(address, buffer, buffer.Length, out int got);
+            value = got > 0 ? ValueCodec.Format(new ReadOnlySpan<byte>(buffer, 0, got), type) : "";
+        }
+        else if (type == ScanValueType.ByteArray)
+        {
+            string? lengthText = AdvTheme.Prompt(this, "Array of byte", "Jumlah byte (1-256):", "8");
+
+            if (lengthText == null)
+                return;
+
+            if (!int.TryParse(lengthText.Trim(), out int length) || length < 1 || length > 256)
+            {
+                Say("Jumlah byte harus 1 sampai 256.");
+                return;
+            }
+
+            byte[]? data = t.ReadBytes(address, length);
+            value = data != null ? ValueCodec.Format(data, type) : "00";
+        }
+        else
+        {
+            byte[]? data = t.ReadBytes(address, ValueCodec.Size(type));
+            value = data != null ? ValueCodec.Format(data, type) : "0";
+        }
 
         manager.Add(new AddressEntry
         {
             Description = "No description",
             Address = t.Describe(address),
             ValueType = ValueCodec.Name(type),
+            Signed = ValueCodec.DefaultSigned(type),
             Value = value,
             Group = "Default"
         });
@@ -750,7 +783,8 @@ internal sealed class MemoryViewerPanel : UserControl
         ScanValueType[] types =
         {
             ScanValueType.Byte, ScanValueType.Int16, ScanValueType.Int32,
-            ScanValueType.Int64, ScanValueType.Float, ScanValueType.Double
+            ScanValueType.Int64, ScanValueType.Float, ScanValueType.Double,
+            ScanValueType.String, ScanValueType.ByteArray
         };
 
         foreach (ScanValueType type in types)
