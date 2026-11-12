@@ -15,6 +15,14 @@ internal enum ScanMode
     Changed
 }
 
+/// <summary>Filter atribut region, seperti kotak tiga-keadaan di Cheat Engine.</summary>
+internal enum ScanFilter
+{
+    Any,      // bebas (kotak terisi)
+    Must,     // wajib punya (dicentang)
+    MustNot   // dilarang punya (kosong)
+}
+
 internal sealed class ScanSpec
 {
     public ScanValueType Type;
@@ -22,8 +30,12 @@ internal sealed class ScanSpec
     public bool Unicode;
     public ulong Start;
     public ulong Stop = ulong.MaxValue;
-    public bool WritableOnly = true;
-    public bool IncludeExecutable;
+    public ScanFilter Writable = ScanFilter.Must;
+    public ScanFilter Executable = ScanFilter.Any;
+    public ScanFilter CopyOnWrite = ScanFilter.Any;
+
+    /// <summary>Hanya berlaku untuk String. false = huruf besar/kecil dianggap sama (default Cheat Engine).</summary>
+    public bool CaseSensitive = true;
     public int Alignment = 1;
 }
 
@@ -97,6 +109,7 @@ internal sealed class MemoryScanner
         public ScanValueType Type;
         public int Size;
         public bool Unicode;
+        public bool IgnoreCase;
         public int Align;
         public int Pid;
     }
@@ -112,6 +125,10 @@ internal sealed class MemoryScanner
     public bool Unicode => current?.Unicode ?? false;
     public int ValueSize => current?.Size ?? 0;
     public bool CanUndo => hasUndo;
+
+    /// <summary>Jumlah region dan byte yang dipindai pada First Scan terakhir.</summary>
+    public int LastRegionCount { get; private set; }
+    public long LastScannedBytes { get; private set; }
 
     public long SnapshotBytes
     {
@@ -182,7 +199,8 @@ internal sealed class MemoryScanner
             Size = s.Size,
             Unicode = s.Unicode,
             Align = s.Align,
-            Pid = s.Pid
+            Pid = s.Pid,
+            IgnoreCase = s.IgnoreCase
         });
 
         return removed;
@@ -204,6 +222,14 @@ internal sealed class MemoryScanner
     // PILIH REGION
     // ---------------------------------------------------------
 
+    private static bool Passes(ScanFilter filter, bool has)
+    {
+        if (filter == ScanFilter.Any)
+            return true;
+
+        return filter == ScanFilter.Must ? has : !has;
+    }
+
     private static List<AddrRange> SelectRanges(TargetProcess t, ScanSpec spec, out long total)
     {
         var list = new List<AddrRange>();
@@ -214,10 +240,13 @@ internal sealed class MemoryScanner
             if (!r.IsReadable)
                 continue;
 
-            if (spec.WritableOnly && !r.IsWritable)
+            if (!Passes(spec.Writable, r.IsWritable))
                 continue;
 
-            if (!spec.IncludeExecutable && r.IsExecutable)
+            if (!Passes(spec.Executable, r.IsExecutable))
+                continue;
+
+            if (!Passes(spec.CopyOnWrite, r.IsCopyOnWrite))
                 continue;
 
             ulong lo = Math.Max(r.Base, spec.Start);
@@ -253,6 +282,8 @@ internal sealed class MemoryScanner
 
         int align = Math.Max(1, spec.Alignment);
         List<AddrRange> ranges = SelectRanges(t, spec, out long total);
+        LastRegionCount = ranges.Count;
+        LastScannedBytes = total;
 
         long done = 0;
         int lastPercent = -1;
@@ -273,11 +304,14 @@ internal sealed class MemoryScanner
             }
         }
 
+        bool ignoreCase = spec.Type == ScanValueType.String && !spec.CaseSensitive;
+
         var next = new State
         {
             Type = spec.Type,
             Size = size,
             Unicode = spec.Unicode,
+            IgnoreCase = ignoreCase,
             Align = align,
             Pid = t.Id
         };
@@ -291,7 +325,7 @@ internal sealed class MemoryScanner
             byte[] buffer = new byte[ChunkSize];
 
             foreach (AddrRange r in ranges)
-                ScanRangeExact(t, r, spec.Value, align, rs, buffer, Tick, ct);
+                ScanRangeExact(t, r, spec.Value, align, rs, buffer, Tick, ct, ignoreCase);
 
             next.Results = rs;
         }
@@ -353,9 +387,11 @@ internal sealed class MemoryScanner
         ResultSet rs,
         byte[] buffer,
         Action<long> tick,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool ignoreCase)
     {
         int size = pattern.Length;
+        byte[] folded = ignoreCase ? FoldAll(pattern) : pattern;
         ulong pos = range.Lo;
 
         while (pos + (ulong)size <= range.Hi)
@@ -373,11 +409,98 @@ internal sealed class MemoryScanner
                 continue;
             }
 
-            ScanBufferExact(buffer, got, pos, pattern, align, rs);
+            if (ignoreCase)
+                ScanBufferIgnoreCase(buffer, got, pos, folded, align, rs);
+            else
+                ScanBufferExact(buffer, got, pos, pattern, align, rs);
 
             int step = got - size + 1;
             tick(step);
             pos += (ulong)step;
+        }
+    }
+
+    // ---------------------------------------------------------
+    // PENCOCOKAN TANPA PEDULI HURUF BESAR/KECIL (String)
+    // ---------------------------------------------------------
+
+    private static byte Fold(byte b)
+    {
+        return b >= (byte)'A' && b <= (byte)'Z' ? (byte)(b | 0x20) : b;
+    }
+
+    private static byte[] FoldAll(byte[] data)
+    {
+        var result = new byte[data.Length];
+
+        for (int i = 0; i < data.Length; i++)
+            result[i] = Fold(data[i]);
+
+        return result;
+    }
+
+    private static bool EqualsIgnoreCase(ReadOnlySpan<byte> a, byte[] b)
+    {
+        if (a.Length != b.Length)
+            return false;
+
+        for (int i = 0; i < b.Length; i++)
+        {
+            if (Fold(a[i]) != Fold(b[i]))
+                return false;
+        }
+
+        return true;
+    }
+
+    private static void ScanBufferIgnoreCase(
+        byte[] buffer,
+        int length,
+        ulong basePos,
+        byte[] folded,
+        int align,
+        ResultSet rs)
+    {
+        int size = folded.Length;
+        int last = length - size;
+
+        if (last < 0)
+            return;
+
+        var span = new ReadOnlySpan<byte>(buffer, 0, length);
+        byte first = folded[0];
+        bool letter = first >= (byte)'a' && first <= (byte)'z';
+        byte upper = letter ? (byte)(first - 32) : first;
+        int idx = 0;
+
+        while (idx <= last)
+        {
+            ReadOnlySpan<byte> window = span.Slice(idx, last - idx + 1);
+            int f = letter ? window.IndexOfAny(first, upper) : window.IndexOf(first);
+
+            if (f < 0)
+                break;
+
+            int at = idx + f;
+
+            if (align <= 1 || ((basePos + (ulong)at) % (ulong)align) == 0)
+            {
+                bool match = true;
+
+                for (int j = 1; j < size; j++)
+                {
+                    if (Fold(span[at + j]) != folded[j])
+                    {
+                        match = false;
+                        break;
+                    }
+                }
+
+                if (match)
+                    rs.Add(basePos + (ulong)at, span.Slice(at, size));
+            }
+
+            idx = at + 1;
         }
     }
 
@@ -499,12 +622,18 @@ internal sealed class MemoryScanner
         ScanValueType type,
         ReadOnlySpan<byte> cur,
         ReadOnlySpan<byte> old,
-        byte[]? exact)
+        byte[]? exact,
+        bool ignoreCase)
     {
         switch (mode)
         {
             case ScanMode.Exact:
-                return exact != null && cur.SequenceEqual(new ReadOnlySpan<byte>(exact));
+                if (exact == null)
+                    return false;
+
+                return ignoreCase
+                    ? EqualsIgnoreCase(cur, exact)
+                    : cur.SequenceEqual(new ReadOnlySpan<byte>(exact));
 
             case ScanMode.Unchanged:
                 return cur.SequenceEqual(old);
@@ -570,7 +699,7 @@ internal sealed class MemoryScanner
                         var cur = new ReadOnlySpan<byte>(buffer, i, size);
                         var old = new ReadOnlySpan<byte>(c.Data, i, size);
 
-                        if (Match(mode, state.Type, cur, old, value))
+                        if (Match(mode, state.Type, cur, old, value, state.IgnoreCase))
                             rs.Add(c.Base + (ulong)i, cur);
                     }
                 }
@@ -617,7 +746,7 @@ internal sealed class MemoryScanner
                         int off = (int)(src.Addr[k] - address);
                         var cur = new ReadOnlySpan<byte>(window, off, size);
 
-                        if (Match(mode, state.Type, cur, src.ValueAt(k), value))
+                        if (Match(mode, state.Type, cur, src.ValueAt(k), value, state.IgnoreCase))
                             rs.Add(src.Addr[k], cur);
                     }
                 }
@@ -630,7 +759,7 @@ internal sealed class MemoryScanner
 
                         var cur = new ReadOnlySpan<byte>(single, 0, size);
 
-                        if (Match(mode, state.Type, cur, src.ValueAt(k), value))
+                        if (Match(mode, state.Type, cur, src.ValueAt(k), value, state.IgnoreCase))
                             rs.Add(src.Addr[k], cur);
                     }
                 }
@@ -648,7 +777,8 @@ internal sealed class MemoryScanner
             Size = state.Size,
             Unicode = state.Unicode,
             Align = state.Align,
-            Pid = state.Pid
+            Pid = state.Pid,
+            IgnoreCase = state.IgnoreCase
         });
     }
 }
