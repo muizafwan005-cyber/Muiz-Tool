@@ -33,6 +33,8 @@ internal sealed class MemoryScannerPanel : UserControl
     private readonly CheckBox unicodeCheck;
     private readonly CheckBox writableCheck;
     private readonly CheckBox execCheck;
+    private readonly CheckBox copyCheck;
+    private readonly CheckBox caseCheck;
     private readonly ComboBox scanTypeCombo;
     private readonly ComboBox valueTypeCombo;
     private readonly ProgressBar progress;
@@ -130,6 +132,11 @@ internal sealed class MemoryScannerPanel : UserControl
         right.Controls.Add(valueTypeCombo);
         right.Controls.Add(unicodeCheck);
 
+        // Seperti Cheat Engine: untuk String, huruf besar/kecil dianggap sama kecuali dicentang.
+        caseCheck = AdvTheme.Chk("Case sensitive").At(238, y + 24);
+        caseCheck.Visible = false;
+        right.Controls.Add(caseCheck);
+
         y += 42;
         right.Controls.Add(AdvTheme.Lbl("Memory Scan Options", true).At(8, y));
 
@@ -143,13 +150,23 @@ internal sealed class MemoryScannerPanel : UserControl
         stopBox = AdvTheme.Txt(240, "7FFFFFFFFFFF").At(80, y);
         right.Controls.Add(stopBox);
 
+        // Kotak tiga-keadaan seperti Cheat Engine:
+        // dicentang = wajib punya, kosong = dilarang, terisi (■) = bebas.
         y += 32;
-        writableCheck = AdvTheme.Chk("Writable", true).At(80, y);
-        execCheck = AdvTheme.Chk("Executable").At(180, y);
+        writableCheck = AdvTheme.Chk("Writable", true).At(8, y);
+        writableCheck.ThreeState = true;
+        execCheck = AdvTheme.Chk("Executable").At(94, y);
+        execCheck.ThreeState = true;
+        execCheck.CheckState = CheckState.Indeterminate;
+        copyCheck = AdvTheme.Chk("CopyOnWrite").At(188, y);
+        copyCheck.ThreeState = true;
+        copyCheck.CheckState = CheckState.Indeterminate;
         right.Controls.Add(writableCheck);
         right.Controls.Add(execCheck);
+        right.Controls.Add(copyCheck);
+        right.Controls.Add(AdvTheme.Lbl("centang = wajib, kosong = dilarang, ■ = bebas", true).At(8, y + 24));
 
-        y += 30;
+        y += 48;
         right.Controls.Add(AdvTheme.Lbl("Alignment").At(8, y + 4));
         alignBox = AdvTheme.Txt(50, "4").At(80, y);
         right.Controls.Add(alignBox);
@@ -288,6 +305,7 @@ internal sealed class MemoryScannerPanel : UserControl
 
         var type = (ScanValueType)valueTypeCombo.SelectedIndex;
         unicodeCheck.Visible = type == ScanValueType.String;
+        caseCheck.Visible = type == ScanValueType.String;
         hexCheck.Enabled = type != ScanValueType.Float && type != ScanValueType.Double && type != ScanValueType.String;
         alignBox.Text = ValueCodec.DefaultAlignment(type, unicodeCheck.Checked).ToString();
         RebuildScanTypes();
@@ -310,6 +328,8 @@ internal sealed class MemoryScannerPanel : UserControl
         alignBox.Enabled = !has && !busy;
         writableCheck.Enabled = !has && !busy;
         execCheck.Enabled = !has && !busy;
+        copyCheck.Enabled = !has && !busy;
+        caseCheck.Enabled = !has && !busy;
         scanTypeCombo.Enabled = !busy;
         valueBox.Enabled = !busy;
     }
@@ -430,8 +450,10 @@ internal sealed class MemoryScannerPanel : UserControl
             Unicode = unicode,
             Start = start,
             Stop = stop,
-            WritableOnly = writableCheck.Checked,
-            IncludeExecutable = execCheck.Checked,
+            Writable = ToFilter(writableCheck),
+            Executable = ToFilter(execCheck),
+            CopyOnWrite = ToFilter(copyCheck),
+            CaseSensitive = caseCheck.Checked,
             Alignment = align
         };
 
@@ -491,7 +513,12 @@ internal sealed class MemoryScannerPanel : UserControl
                     scanner.NextScan(t, mode, value, ReportProgress, token);
             });
 
-            Status("Selesai dalam " + sw.Elapsed.TotalSeconds.ToString("0.0") + " detik.");
+            string stats = first
+                ? " Dipindai " + scanner.LastRegionCount.ToString("N0") + " region (" +
+                  (scanner.LastScannedBytes / (1024 * 1024)).ToString("N0") + " MB)."
+                : "";
+
+            Status("Selesai dalam " + sw.Elapsed.TotalSeconds.ToString("0.0") + " detik." + stats);
             DebugLog.Info("Scan " + (first ? "pertama" : "lanjutan") + " selesai: " + scanner.ResultCount + " hasil.");
         }
         catch (OperationCanceledException)
@@ -855,5 +882,13 @@ internal sealed class MemoryScannerPanel : UserControl
         }
 
         PointerScanRequested?.Invoke(scanner.AddressAt(selected[0]).ToString("X"));
+    }
+
+    private static ScanFilter ToFilter(CheckBox box)
+    {
+        if (box.CheckState == CheckState.Checked)
+            return ScanFilter.Must;
+
+        return box.CheckState == CheckState.Unchecked ? ScanFilter.MustNot : ScanFilter.Any;
     }
 }
