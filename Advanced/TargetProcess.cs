@@ -54,6 +54,10 @@ internal readonly struct MemRegion
         (Protect & (NativeApi.PAGE_EXECUTE | NativeApi.PAGE_EXECUTE_READ |
                     NativeApi.PAGE_EXECUTE_READWRITE | NativeApi.PAGE_EXECUTE_WRITECOPY)) != 0;
 
+    public bool IsCopyOnWrite =>
+        IsCommitted &&
+        (Protect & (NativeApi.PAGE_WRITECOPY | NativeApi.PAGE_EXECUTE_WRITECOPY)) != 0;
+
     public string StateText
     {
         get
