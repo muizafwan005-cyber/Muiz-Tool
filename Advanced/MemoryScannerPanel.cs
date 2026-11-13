@@ -35,6 +35,7 @@ internal sealed class MemoryScannerPanel : UserControl
     private readonly CheckBox execCheck;
     private readonly CheckBox copyCheck;
     private readonly CheckBox caseCheck;
+    private readonly CheckBox roundedCheck;
     private readonly ComboBox scanTypeCombo;
     private readonly ComboBox valueTypeCombo;
     private readonly ProgressBar progress;
@@ -136,6 +137,11 @@ internal sealed class MemoryScannerPanel : UserControl
         caseCheck = AdvTheme.Chk("Case sensitive").At(238, y + 24);
         caseCheck.Visible = false;
         right.Controls.Add(caseCheck);
+
+        // Untuk Float/Double: cocokkan hasil pembulatan seperti Cheat Engine (default).
+        roundedCheck = AdvTheme.Chk("Rounded", true).At(238, y + 24);
+        roundedCheck.Visible = false;
+        right.Controls.Add(roundedCheck);
 
         y += 42;
         right.Controls.Add(AdvTheme.Lbl("Memory Scan Options", true).At(8, y));
@@ -306,6 +312,7 @@ internal sealed class MemoryScannerPanel : UserControl
         var type = (ScanValueType)valueTypeCombo.SelectedIndex;
         unicodeCheck.Visible = type == ScanValueType.String;
         caseCheck.Visible = type == ScanValueType.String;
+        roundedCheck.Visible = type == ScanValueType.Float || type == ScanValueType.Double;
         hexCheck.Enabled = type != ScanValueType.Float && type != ScanValueType.Double && type != ScanValueType.String;
         alignBox.Text = ValueCodec.DefaultAlignment(type, unicodeCheck.Checked).ToString();
         RebuildScanTypes();
@@ -489,10 +496,28 @@ internal sealed class MemoryScannerPanel : UserControl
             value = parsed;
         }
 
+        bool rounded = false;
+        double low = 0;
+        double high = 0;
+
+        if (mode == ScanMode.Exact &&
+            (type == ScanValueType.Float || type == ScanValueType.Double) &&
+            roundedCheck.Checked)
+        {
+            rounded = ValueCodec.TryGetRoundedRange(valueBox.Text, out low, out high);
+        }
+
         ScanSpec? spec = null;
 
         if (first && !BuildSpec(t, type, unicode, value, out spec))
             return;
+
+        if (first && spec != null && rounded)
+        {
+            spec.Rounded = true;
+            spec.RangeLow = low;
+            spec.RangeHigh = high;
+        }
 
         busy = true;
         UpdateButtons();
@@ -510,7 +535,7 @@ internal sealed class MemoryScannerPanel : UserControl
                 if (first)
                     scanner.FirstScan(t, spec!, mode, ReportProgress, token);
                 else
-                    scanner.NextScan(t, mode, value, ReportProgress, token);
+                    scanner.NextScan(t, mode, value, ReportProgress, token, rounded, low, high);
             });
 
             string stats = first
