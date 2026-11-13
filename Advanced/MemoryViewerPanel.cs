@@ -66,7 +66,8 @@ internal sealed class HexView : Control
 
     public void GoTo(ulong address)
     {
-        BaseAddress = address & ~0xFUL;
+        // Alamat yang dituju berada di kiri atas, seperti Cheat Engine (tanpa pembulatan ke 16).
+        BaseAddress = address;
         Selected = address;
         heat = Array.Empty<byte>();
         Reload();
@@ -298,17 +299,21 @@ internal sealed class HexView : Control
 
         int rows = VisibleRows;
 
+        ulong window = (ulong)(rows * Cols);
+
         if (Selected < BaseAddress)
         {
-            BaseAddress = Selected & ~0xFUL;
+            // Geser mundur per baris penuh sampai alamat terpilih terlihat.
+            ulong gap = BaseAddress - Selected;
+            ulong back = (gap + Cols - 1) / Cols * Cols;
+            BaseAddress = BaseAddress >= back ? BaseAddress - back : 0;
             heat = Array.Empty<byte>();
             Reload();
         }
-        else if (Selected >= BaseAddress + (ulong)(rows * Cols))
+        else if (Selected >= BaseAddress + window)
         {
-            ulong rowStart = Selected & ~0xFUL;
-            ulong back = (ulong)((rows - 1) * Cols);
-            BaseAddress = rowStart >= back ? rowStart - back : 0;
+            ulong over = Selected - (BaseAddress + window) + 1;
+            BaseAddress += (over + Cols - 1) / Cols * Cols;
             heat = Array.Empty<byte>();
             Reload();
         }
@@ -544,12 +549,12 @@ internal sealed class MemoryViewerPanel : UserControl
 
         if (b == null)
         {
-            valueLabel.Text = "byte: ??  (alamat tidak bisa dibaca)";
+            valueLabel.Text = t.FormatAddress(sel) + "  :  byte: ??  (alamat tidak bisa dibaca)";
             return;
         }
 
         var sb = new StringBuilder();
-        sb.Append("byte: ").Append(b[0]);
+        sb.Append(t.FormatAddress(sel)).Append("  :  byte: ").Append(b[0]);
         sb.Append("   word: ").Append(BitConverter.ToInt16(b, 0));
         sb.Append("   integer: ").Append(BitConverter.ToInt32(b, 0));
         sb.Append("   int64: ").Append(BitConverter.ToInt64(b, 0));
