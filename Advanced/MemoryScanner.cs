@@ -36,6 +36,11 @@ internal sealed class ScanSpec
 
     /// <summary>Hanya berlaku untuk String. false = huruf besar/kecil dianggap sama (default Cheat Engine).</summary>
     public bool CaseSensitive = true;
+
+    /// <summary>Float/Double: cocokkan rentang pembulatan (default Cheat Engine), bukan bit persis.</summary>
+    public bool Rounded;
+    public double RangeLow;
+    public double RangeHigh;
     public int Alignment = 1;
 }
 
@@ -52,21 +57,28 @@ internal sealed class ScanLimitException : Exception
 /// </summary>
 internal sealed class MemoryScanner
 {
-    public const int MaxResults = 8_000_000;
+    public const int MaxResults = 80_000_000;
     private const long MaxSnapshotBytes = 768L * 1024 * 1024;
     private const int ChunkSize = 4 * 1024 * 1024;
 
     private sealed class ResultSet
     {
-        public ulong[] Addr = new ulong[1024];
-        public byte[] Prev;
-        public int Count;
-        public readonly int Stride;
+        private const int BlockShift = 18;
+        private const int BlockSize = 1 << BlockShift;
+        private const int BlockMask = BlockSize - 1;
 
-        public ResultSet(int stride)
+        private readonly List<uint[]> narrow = new List<uint[]>();
+        private readonly List<ulong[]> wide = new List<ulong[]>();
+        private readonly List<byte[]> values = new List<byte[]>();
+
+        public readonly int Stride;
+        public readonly bool Wide;
+        public int Count;
+
+        public ResultSet(int stride, bool wide)
         {
             Stride = stride;
-            Prev = new byte[1024 * stride];
+            Wide = wide;
         }
 
         public void Add(ulong address, ReadOnlySpan<byte> value)
@@ -75,24 +87,41 @@ internal sealed class MemoryScanner
             {
                 throw new ScanLimitException(
                     "Hasil terlalu banyak (lebih dari " + MaxResults.ToString("N0") +
-                    "). Persempit pencarian: pakai Exact Value, rentang alamat, atau opsi Writable.");
+                    "). Persempit pencarian: pakai nilai yang lebih spesifik atau rentang alamat.");
             }
 
-            if (Count == Addr.Length)
+            int block = Count >> BlockShift;
+            int offset = Count & BlockMask;
+
+            if (block == values.Count)
             {
-                int n = Addr.Length * 2;
-                Array.Resize(ref Addr, n);
-                Array.Resize(ref Prev, n * Stride);
+                if (Wide)
+                    wide.Add(new ulong[BlockSize]);
+                else
+                    narrow.Add(new uint[BlockSize]);
+
+                values.Add(new byte[BlockSize * Stride]);
             }
 
-            Addr[Count] = address;
-            value.CopyTo(new Span<byte>(Prev, Count * Stride, Stride));
+            if (Wide)
+                wide[block][offset] = address;
+            else
+                narrow[block][offset] = unchecked((uint)address);
+
+            value.CopyTo(new Span<byte>(values[block], offset * Stride, Stride));
             Count++;
+        }
+
+        public ulong AddrAt(int index)
+        {
+            int block = index >> BlockShift;
+            int offset = index & BlockMask;
+            return Wide ? wide[block][offset] : narrow[block][offset];
         }
 
         public ReadOnlySpan<byte> ValueAt(int index)
         {
-            return new ReadOnlySpan<byte>(Prev, index * Stride, Stride);
+            return new ReadOnlySpan<byte>(values[index >> BlockShift], (index & BlockMask) * Stride, Stride);
         }
     }
 
@@ -165,7 +194,7 @@ internal sealed class MemoryScanner
 
     public ulong AddressAt(int index)
     {
-        return current!.Results!.Addr[index];
+        return current!.Results!.AddrAt(index);
     }
 
     /// <summary>Menghapus baris hasil tertentu dari daftar (bisa di-Undo).</summary>
@@ -182,12 +211,12 @@ internal sealed class MemoryScanner
             return 0;
 
         ResultSet src = s.Results;
-        var rs = new ResultSet(src.Stride);
+        var rs = new ResultSet(src.Stride, src.Wide);
 
         for (int i = 0; i < src.Count; i++)
         {
             if (!drop.Contains(i))
-                rs.Add(src.Addr[i], src.ValueAt(i));
+                rs.Add(src.AddrAt(i), src.ValueAt(i));
         }
 
         int removed = src.Count - rs.Count;
@@ -321,11 +350,25 @@ internal sealed class MemoryScanner
             if (spec.Value == null)
                 throw new InvalidOperationException("Nilai pencarian belum diisi.");
 
-            var rs = new ResultSet(size);
+            var rs = new ResultSet(size, !t.Is32Bit);
             byte[] buffer = new byte[ChunkSize];
 
+            bool rounded = spec.Rounded &&
+                           (spec.Type == ScanValueType.Float || spec.Type == ScanValueType.Double);
+
             foreach (AddrRange r in ranges)
-                ScanRangeExact(t, r, spec.Value, align, rs, buffer, Tick, ct, ignoreCase);
+            {
+                if (rounded)
+                {
+                    ScanRangeFloat(
+                        t, r, spec.Type == ScanValueType.Double,
+                        spec.RangeLow, spec.RangeHigh, align, rs, buffer, Tick, ct);
+                }
+                else
+                {
+                    ScanRangeExact(t, r, spec.Value, align, rs, buffer, Tick, ct, ignoreCase);
+                }
+            }
 
             next.Results = rs;
         }
@@ -423,6 +466,74 @@ internal sealed class MemoryScanner
     // ---------------------------------------------------------
     // PENCOCOKAN TANPA PEDULI HURUF BESAR/KECIL (String)
     // ---------------------------------------------------------
+
+    private static void ScanRangeFloat(
+        TargetProcess t,
+        AddrRange range,
+        bool isDouble,
+        double low,
+        double high,
+        int align,
+        ResultSet rs,
+        byte[] buffer,
+        Action<long> tick,
+        CancellationToken ct)
+    {
+        int size = isDouble ? 8 : 4;
+        ulong pos = range.Lo;
+
+        while (pos + (ulong)size <= range.Hi)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            int want = (int)Math.Min((ulong)buffer.Length, range.Hi - pos);
+            t.TryRead(pos, buffer, want, out int got);
+
+            if (got < size)
+            {
+                ulong skip = 4096UL - (pos % 4096UL);
+                tick((long)skip);
+                pos += skip;
+                continue;
+            }
+
+            ScanBufferFloat(buffer, got, pos, isDouble, low, high, align, rs);
+
+            int step = got - size + 1;
+            tick(step);
+            pos += (ulong)step;
+        }
+    }
+
+    private static void ScanBufferFloat(
+        byte[] buffer,
+        int length,
+        ulong basePos,
+        bool isDouble,
+        double low,
+        double high,
+        int align,
+        ResultSet rs)
+    {
+        int size = isDouble ? 8 : 4;
+        int last = length - size;
+
+        if (last < 0)
+            return;
+
+        var span = new ReadOnlySpan<byte>(buffer, 0, length);
+        int first = (int)(((ulong)align - (basePos % (ulong)align)) % (ulong)align);
+
+        for (int i = first; i <= last; i += align)
+        {
+            double v = isDouble
+                ? MemoryMarshal.Read<double>(span.Slice(i))
+                : MemoryMarshal.Read<float>(span.Slice(i));
+
+            if (v >= low && v < high)
+                rs.Add(basePos + (ulong)i, span.Slice(i, size));
+        }
+    }
 
     private static byte Fold(byte b)
     {
@@ -623,11 +734,23 @@ internal sealed class MemoryScanner
         ReadOnlySpan<byte> cur,
         ReadOnlySpan<byte> old,
         byte[]? exact,
-        bool ignoreCase)
+        bool ignoreCase,
+        bool rounded,
+        double low,
+        double high)
     {
         switch (mode)
         {
             case ScanMode.Exact:
+                if (rounded && (type == ScanValueType.Float || type == ScanValueType.Double))
+                {
+                    double numeric = type == ScanValueType.Float
+                        ? BitConverter.ToSingle(cur)
+                        : BitConverter.ToDouble(cur);
+
+                    return numeric >= low && numeric < high;
+                }
+
                 if (exact == null)
                     return false;
 
@@ -657,7 +780,10 @@ internal sealed class MemoryScanner
         ScanMode mode,
         byte[]? value,
         Action<int>? progress,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool rounded = false,
+        double low = 0,
+        double high = 0)
     {
         State? state = current;
 
@@ -674,7 +800,7 @@ internal sealed class MemoryScanner
             throw new InvalidOperationException("Nilai pencarian belum diisi.");
 
         int size = state.Size;
-        var rs = new ResultSet(size);
+        var rs = new ResultSet(size, !t.Is32Bit);
 
         if (state.Snapshot != null)
         {
@@ -699,7 +825,7 @@ internal sealed class MemoryScanner
                         var cur = new ReadOnlySpan<byte>(buffer, i, size);
                         var old = new ReadOnlySpan<byte>(c.Data, i, size);
 
-                        if (Match(mode, state.Type, cur, old, value, state.IgnoreCase))
+                        if (Match(mode, state.Type, cur, old, value, state.IgnoreCase, rounded, low, high))
                             rs.Add(c.Base + (ulong)i, cur);
                     }
                 }
@@ -725,42 +851,42 @@ internal sealed class MemoryScanner
                     progress?.Invoke((int)(i * 100L / Math.Max(1, src.Count)));
                 }
 
-                ulong address = src.Addr[i];
+                ulong address = src.AddrAt(i);
 
                 // Kumpulkan hasil yang berdekatan agar dibaca dengan satu panggilan.
                 int j = i;
 
                 while (j + 1 < src.Count &&
-                       src.Addr[j + 1] + (ulong)size <= address + (ulong)window.Length)
+                       src.AddrAt(j + 1) + (ulong)size <= address + (ulong)window.Length)
                 {
                     j++;
                 }
 
-                int span = (int)(src.Addr[j] + (ulong)size - address);
+                int span = (int)(src.AddrAt(j) + (ulong)size - address);
                 bool okWindow = t.TryRead(address, window, span, out int got) && got >= span;
 
                 if (okWindow)
                 {
                     for (int k = i; k <= j; k++)
                     {
-                        int off = (int)(src.Addr[k] - address);
+                        int off = (int)(src.AddrAt(k) - address);
                         var cur = new ReadOnlySpan<byte>(window, off, size);
 
-                        if (Match(mode, state.Type, cur, src.ValueAt(k), value, state.IgnoreCase))
-                            rs.Add(src.Addr[k], cur);
+                        if (Match(mode, state.Type, cur, src.ValueAt(k), value, state.IgnoreCase, rounded, low, high))
+                            rs.Add(src.AddrAt(k), cur);
                     }
                 }
                 else
                 {
                     for (int k = i; k <= j; k++)
                     {
-                        if (!t.TryRead(src.Addr[k], single, size, out int g) || g < size)
+                        if (!t.TryRead(src.AddrAt(k), single, size, out int g) || g < size)
                             continue;
 
                         var cur = new ReadOnlySpan<byte>(single, 0, size);
 
-                        if (Match(mode, state.Type, cur, src.ValueAt(k), value, state.IgnoreCase))
-                            rs.Add(src.Addr[k], cur);
+                        if (Match(mode, state.Type, cur, src.ValueAt(k), value, state.IgnoreCase, rounded, low, high))
+                            rs.Add(src.AddrAt(k), cur);
                     }
                 }
 
