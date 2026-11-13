@@ -16,12 +16,29 @@ internal sealed class AdvancedServices : IDisposable
     public AddressManager Manager { get; }
     public FreezeService Freeze { get; }
 
+    /// <summary>Mesin Lua Advance bersama (state persisten antar skrip).</summary>
+    public LuaAdvance Lua { get; }
+
     /// <param name="getProcess">Mengembalikan process yang sedang di-ATTACH (atau null).</param>
     public AdvancedServices(Func<Process?> getProcess, AddressManager manager)
     {
         Target = new TargetProvider(getProcess);
         Manager = manager;
         Freeze = new FreezeService(Target, manager);
+
+        // Aksi UI dari thread Lua dikembalikan ke UI thread (AdvancedServices dibuat di UI thread).
+        SynchronizationContext? context = SynchronizationContext.Current;
+
+        Lua = new LuaAdvance(
+            Target,
+            manager,
+            action =>
+            {
+                if (context != null)
+                    context.Post(_ => action(), null);
+                else
+                    action();
+            });
     }
 
     /// <summary>Dipanggil dari DetachCurrent(): semua Freeze dimatikan, handle ditutup.</summary>
@@ -33,6 +50,7 @@ internal sealed class AdvancedServices : IDisposable
         Freeze.Refresh();
         Target.Invalidate();
         SymbolTable.Clear();
+        Lua.Reset();
     }
 
     public void Dispose()
