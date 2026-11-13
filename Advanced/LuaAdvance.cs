@@ -12,65 +12,162 @@ namespace RFTool.Advanced;
 /// (readInteger, writeInteger, getAddress, AOBScan, autoAssemble, dst).
 /// Catatan: angka Lua bertipe double sehingga nilai di atas 2^53 kehilangan presisi.
 /// </summary>
+internal sealed class LuaResult
+{
+    public bool Ok;
+    public bool Cancelled;
+    public string Error = "";
+
+    /// <summary>String yang dikembalikan skrip; blok {$lua} memakainya sebagai kode assembly.</summary>
+    public string? Text;
+}
+
 internal sealed class LuaAdvance
 {
     private readonly TargetProvider provider;
     private readonly AddressManager manager;
-    private readonly Action<string> output;
     private readonly Action<Action> postUi;
-    private readonly AaSession aa;
-    private readonly CancellationToken token;
-    private Script script = null!;
+    private readonly object gate = new object();
 
-    public LuaAdvance(
-        TargetProvider provider,
-        AddressManager manager,
-        Action<string> output,
-        Action<Action> postUi,
-        AaSession aaSession,
-        CancellationToken token)
+    // Dijalankan sekali saat state Lua dibuat: membuat tonumber(teks, basis) andal
+    // (dipakai skrip Cheat Engine seperti tonumber(hits[0], 16)).
+    private const string Prelude = @"do
+  local _tonumber = tonumber
+  function tonumber(e, base)
+    if base == nil then return _tonumber(e) end
+    if type(e) ~= ""string"" then e = tostring(e) end
+    local text = string.gsub(e, ""^%s*(.-)%s*$"", ""%1"")
+    text = string.lower(text)
+    if base == 16 and string.sub(text, 1, 2) == ""0x"" then text = string.sub(text, 3) end
+    if text == """" then return nil end
+    local negative = false
+    if string.sub(text, 1, 1) == ""-"" then
+      negative = true
+      text = string.sub(text, 2)
+    end
+    local n = 0
+    for i = 1, #text do
+      local c = string.byte(text, i)
+      local d
+      if c >= 48 and c <= 57 then d = c - 48
+      elseif c >= 97 and c <= 122 then d = c - 87
+      else return nil end
+      if d >= base then return nil end
+      n = n * base + d
+    end
+    if negative then n = -n end
+    return n
+  end
+end
+";
+
+    // State Lua bersifat PERSISTEN seperti Cheat Engine: variabel global (mis. _G.Nama)
+    // tetap ada antar skrip sampai Reset() atau process di-detach.
+    private Script script = null!;
+    private bool created;
+
+    // Konteks eksekusi saat ini (dibaca oleh fungsi-fungsi API).
+    private Action<string> output = s => { };
+    private AaSession aa = new AaSession();
+    private CancellationToken token;
+
+    public LuaAdvance(TargetProvider provider, AddressManager manager, Action<Action> postUi)
     {
         this.provider = provider;
         this.manager = manager;
-        this.output = output;
         this.postUi = postUi;
-        aa = aaSession;
-        this.token = token;
     }
 
-    /// <summary>Menjalankan kode Lua. Blocking; panggil dari thread latar.</summary>
-    public void Run(string code)
+    /// <summary>Menghapus seluruh state Lua (variabel global, dll).</summary>
+    public void Reset()
     {
-        script = new Script(CoreModules.Preset_SoftSandbox);
-        script.Options.DebugPrint = s => output(s);
-
-        RegisterApi();
-
-        try
+        lock (gate)
         {
-            DynValue function = script.LoadString(code, null, "skrip");
-            DynValue coroutine = script.CreateCoroutine(function);
-
-            // Memberi kesempatan menghentikan skrip yang berputar tanpa henti.
-            coroutine.Coroutine.AutoYieldCounter = 2000;
-
-            while (coroutine.Coroutine.State != CoroutineState.Dead)
-            {
-                token.ThrowIfCancellationRequested();
-                coroutine.Coroutine.Resume();
-            }
+            created = false;
+            script = null!;
         }
-        catch (InterpreterException ex)
-        {
-            output("[Lua Advance] Error: " + (ex.DecoratedMessage ?? ex.Message));
-        }
-        catch (OperationCanceledException)
-        {
+    }
+
+    /// <summary>Menjalankan kode Lua dan mencetak error ke output. Blocking; panggil dari thread latar.</summary>
+    public void Run(string code, Action<string> output, CancellationToken token, AaSession session)
+    {
+        LuaResult result = Execute(code, output, token, session);
+
+        if (result.Cancelled)
             output("[Lua Advance] Dihentikan.");
-        }
-        catch (Exception ex)
+        else if (!result.Ok)
+            output("[Lua Advance] Error: " + result.Error);
+    }
+
+    /// <summary>Menjalankan satu blok Lua dan mengembalikan hasilnya (dipakai juga oleh {$lua}).</summary>
+    public LuaResult Execute(string code, Action<string> output, CancellationToken token, AaSession session)
+    {
+        lock (gate)
         {
-            output("[Lua Advance] Error: " + ex.Message);
+            this.output = output;
+            this.token = token;
+            aa = session;
+
+            if (!created)
+            {
+                script = new Script(CoreModules.Preset_SoftSandbox);
+                script.Options.DebugPrint = s => this.output(s);
+                RegisterApi();
+
+                script.Globals["_G"] = DynValue.NewTable(script.Globals);
+
+                try
+                {
+                    script.DoString(Prelude);
+                }
+                catch (Exception ex)
+                {
+                    output("[Lua Advance] Peringatan: prelude gagal dimuat: " + ex.Message);
+                }
+
+                created = true;
+            }
+
+            // Skrip Cheat Engine memeriksa syntaxcheck untuk melewati eksekusi saat pengecekan sintaks.
+            script.Globals["syntaxcheck"] = DynValue.False;
+
+            try
+            {
+                DynValue function = script.LoadString(code, null, "skrip");
+                DynValue coroutine = script.CreateCoroutine(function);
+
+                // Memberi kesempatan menghentikan skrip yang berputar tanpa henti.
+                coroutine.Coroutine.AutoYieldCounter = 2000;
+
+                DynValue last = DynValue.Nil;
+
+                while (coroutine.Coroutine.State != CoroutineState.Dead)
+                {
+                    token.ThrowIfCancellationRequested();
+                    last = coroutine.Coroutine.Resume();
+                }
+
+                if (last.Type == DataType.Tuple && last.Tuple.Length > 0)
+                    last = last.Tuple[0];
+
+                return new LuaResult
+                {
+                    Ok = true,
+                    Text = last.Type == DataType.String ? last.String : null
+                };
+            }
+            catch (InterpreterException ex)
+            {
+                return new LuaResult { Error = ex.DecoratedMessage ?? ex.Message };
+            }
+            catch (OperationCanceledException)
+            {
+                return new LuaResult { Cancelled = true, Error = "Dihentikan." };
+            }
+            catch (Exception ex)
+            {
+                return new LuaResult { Error = ex.Message };
+            }
         }
     }
 
@@ -389,14 +486,22 @@ internal sealed class LuaAdvance
         });
 
         // ----- pencarian pola -----
-        Reg("AOBScan", a => ScanToTable(a[0].CastToString() ?? "", null));
-        Reg("AOBScanModule", a => ScanToTable(a[1].CastToString() ?? "", a[0].CastToString()));
+        // AOBScan(pattern [, "+W-C"])  /  AOBScanModule(module, pattern [, "+W-C"])
+        Reg("AOBScan", a => ScanToTable(
+            a[0].CastToString() ?? "",
+            null,
+            a.Count > 1 && !a[1].IsNil() ? a[1].CastToString() : null));
+
+        Reg("AOBScanModule", a => ScanToTable(
+            a[1].CastToString() ?? "",
+            a[0].CastToString(),
+            a.Count > 2 && !a[2].IsNil() ? a[2].CastToString() : null));
 
         // ----- Auto Assemble -----
         Reg("autoAssemble", a =>
         {
             string text = a[0].CastToString() ?? "";
-            bool ok = new AutoAssembler(provider, output, token).Run(text, true, aa);
+            bool ok = new AutoAssembler(provider, output, token, null).Run(text, true, aa);
             return DynValue.NewBoolean(ok);
         });
 
@@ -427,7 +532,7 @@ internal sealed class LuaAdvance
         });
     }
 
-    private DynValue ScanToTable(string patternText, string? module)
+    private DynValue ScanToTable(string patternText, string? module, string? flags)
     {
         if (!AobPattern.TryParse(patternText, out AobPattern? pattern, out string error) || pattern == null)
             throw new ScriptRuntimeException("Pattern tidak valid: " + error);
@@ -455,6 +560,10 @@ internal sealed class LuaAdvance
             filter = r => r.Base < hi && r.End > lo;
         }
 
+        Func<MemRegion, bool> flagFilter = FlagsFilter(flags);
+        Func<MemRegion, bool>? moduleFilter = filter;
+        filter = moduleFilter == null ? flagFilter : r => moduleFilter(r) && flagFilter(r);
+
         var found = new List<ulong>();
 
         PatternSearcher.Search(
@@ -479,5 +588,63 @@ internal sealed class LuaAdvance
         table.Set(DynValue.NewString("destroy"), DynValue.NewCallback((context, args) => DynValue.Nil));
 
         return DynValue.NewTable(table);
+    }
+
+    private static bool Passes(char sign, bool has)
+    {
+        if (sign == '*')
+            return true;
+
+        return sign == '+' ? has : !has;
+    }
+
+    /// <summary>
+    /// Flag proteksi gaya Cheat Engine, mis. "+W-C": W = writable, X = executable, C = copy-on-write.
+    /// '+' = wajib, '-' = dilarang, '*' = bebas. Tanpa flag, default "+W-C" seperti Cheat Engine.
+    /// </summary>
+    private static Func<MemRegion, bool> FlagsFilter(string? flags)
+    {
+        char writable = '*';
+        char executable = '*';
+        char copyOnWrite = '*';
+
+        if (string.IsNullOrWhiteSpace(flags))
+        {
+            writable = '+';
+            copyOnWrite = '-';
+        }
+        else
+        {
+            char sign = '+';
+
+            foreach (char c in flags)
+            {
+                switch (char.ToUpperInvariant(c))
+                {
+                    case '+':
+                    case '-':
+                    case '*':
+                        sign = c;
+                        break;
+
+                    case 'W':
+                        writable = sign;
+                        break;
+
+                    case 'X':
+                        executable = sign;
+                        break;
+
+                    case 'C':
+                        copyOnWrite = sign;
+                        break;
+                }
+            }
+        }
+
+        return r =>
+            Passes(writable, r.IsWritable) &&
+            Passes(executable, r.IsExecutable) &&
+            Passes(copyOnWrite, r.IsCopyOnWrite);
     }
 }
