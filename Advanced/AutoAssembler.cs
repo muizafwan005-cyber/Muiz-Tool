@@ -65,12 +65,15 @@ internal sealed class AutoAssembler
     private readonly TargetProvider provider;
     private readonly Action<string> log;
     private readonly CancellationToken ct;
+    private readonly LuaAdvance? lua;
 
-    public AutoAssembler(TargetProvider provider, Action<string> log, CancellationToken ct)
+    /// <param name="lua">Mesin Lua untuk blok {$lua}. Null = blok {$lua} tidak didukung.</param>
+    public AutoAssembler(TargetProvider provider, Action<string> log, CancellationToken ct, LuaAdvance? lua)
     {
         this.provider = provider;
         this.log = log;
         this.ct = ct;
+        this.lua = lua;
     }
 
     /// <summary>Menjalankan bagian [ENABLE] (enable=true) atau [DISABLE]. Return true jika sukses.</summary>
@@ -205,9 +208,44 @@ internal sealed class AutoAssembler
         var unregister = new List<string>();
         Block? current = null;
 
+        // {$lua} tanpa {$asm} berlaku sampai akhir bagian: tutup otomatis.
+        CloseOpenLuaBlock(lines);
+
+        bool inLua = false;
+        int luaStart = 0;
+        var luaCode = new List<string>();
+
         for (int i = 0; i < lines.Count; i++)
         {
             ct.ThrowIfCancellationRequested();
+
+            string marker = lines[i].Trim();
+
+            if (inLua)
+            {
+                if (marker.Equals("{$asm}", StringComparison.OrdinalIgnoreCase))
+                {
+                    inLua = false;
+                    RunLuaBlock(luaCode, luaStart, lines, i, session);
+                    luaCode.Clear();
+                }
+                else
+                {
+                    luaCode.Add(lines[i]);
+                }
+
+                continue;
+            }
+
+            if (marker.Equals("{$lua}", StringComparison.OrdinalIgnoreCase))
+            {
+                inLua = true;
+                luaStart = i + 1;
+                continue;
+            }
+
+            if (marker.Equals("{$asm}", StringComparison.OrdinalIgnoreCase))
+                continue;
 
             string line = StripComment(lines[i]).Trim();
 
@@ -284,6 +322,54 @@ internal sealed class AutoAssembler
         }
 
         log("[AA] " + (enable ? "ENABLE" : "DISABLE") + " selesai.");
+    }
+
+    // ---------------------------------------------------------
+    // BLOK {$lua} ... {$asm}
+    // ---------------------------------------------------------
+
+    private static void CloseOpenLuaBlock(List<string> lines)
+    {
+        bool open = false;
+
+        foreach (string raw in lines)
+        {
+            string marker = raw.Trim();
+
+            if (marker.Equals("{$lua}", StringComparison.OrdinalIgnoreCase))
+                open = true;
+            else if (marker.Equals("{$asm}", StringComparison.OrdinalIgnoreCase))
+                open = false;
+        }
+
+        if (open)
+            lines.Add("{$asm}");
+    }
+
+    private void RunLuaBlock(List<string> code, int startLine, List<string> lines, int insertAfter, AaSession session)
+    {
+        if (lua == null)
+        {
+            throw new AaException(
+                "Blok {$lua} (baris " + startLine + ") tidak didukung di konteks ini " +
+                "(mis. di dalam autoAssemble() yang dipanggil dari Lua).");
+        }
+
+        LuaResult result = lua.Execute(string.Join("\n", code), log, ct, session);
+
+        if (result.Cancelled)
+            throw new OperationCanceledException();
+
+        if (!result.Ok)
+            throw new AaException("Blok {$lua} baris " + startLine + ": " + result.Error);
+
+        // String yang dikembalikan Lua disisipkan sebagai kode assembly di posisi ini.
+        if (!string.IsNullOrWhiteSpace(result.Text))
+        {
+            string[] extra = result.Text.Replace("\r", "").Split('\n');
+            lines.InsertRange(insertAfter + 1, extra);
+            log("[AA] {$lua} menghasilkan " + extra.Length + " baris assembly.");
+        }
     }
 
     // ---------------------------------------------------------
