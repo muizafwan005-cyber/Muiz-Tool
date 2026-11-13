@@ -149,6 +149,7 @@ internal sealed class ScriptManagerPanel : UserControl
         disableBtn = AdvTheme.Btn("Disable (AA)", 94);
         stopBtn = AdvTheme.Btn("Stop", 56);
         Button clearBtn = AdvTheme.Btn("Clear", 56);
+        Button resetLuaBtn = AdvTheme.Btn("Reset Lua", 82);
 
         runBar.Controls.Add(saveBtn);
         runBar.Controls.Add(runBtn);
@@ -156,6 +157,7 @@ internal sealed class ScriptManagerPanel : UserControl
         runBar.Controls.Add(disableBtn);
         runBar.Controls.Add(stopBtn);
         runBar.Controls.Add(clearBtn);
+        runBar.Controls.Add(resetLuaBtn);
 
         fileLabel = new Label
         {
@@ -184,6 +186,12 @@ internal sealed class ScriptManagerPanel : UserControl
         disableBtn.Click += (s, e) => RunAa(false);
         stopBtn.Click += (s, e) => cts?.Cancel();
         clearBtn.Click += (s, e) => console.Clear();
+
+        resetLuaBtn.Click += (s, e) =>
+        {
+            services.Lua.Reset();
+            Log("[Lua Advance] State Lua di-reset (variabel global dihapus).");
+        };
 
         scriptList.SelectedIndexChanged += (s, e) => OnSelectionChanged();
 
@@ -509,11 +517,7 @@ internal sealed class ScriptManagerPanel : UserControl
 
         try
         {
-            await Task.Run(() =>
-            {
-                var engine = new LuaAdvance(services.Target, services.Manager, Log, PostUi, luaSession, token);
-                engine.Run(code);
-            });
+            await Task.Run(() => services.Lua.Run(code, Log, token, luaSession));
         }
         finally
         {
@@ -554,7 +558,7 @@ internal sealed class ScriptManagerPanel : UserControl
         try
         {
             bool ok = await Task.Run(() =>
-                new AutoAssembler(services.Target, Log, token).Run(text, enable, session));
+                new AutoAssembler(services.Target, Log, token, services.Lua).Run(text, enable, session));
 
             Log(ok ? "[AA] Berhasil." : "[AA] Gagal (lihat pesan di atas).");
         }
