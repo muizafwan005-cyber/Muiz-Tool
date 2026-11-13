@@ -350,6 +350,33 @@ internal static class ValueCodec
         }
     }
 
+    /// <summary>
+    /// Rentang pembulatan seperti mode "Rounded" Cheat Engine: mengetik 4.85 mencocokkan
+    /// nilai dari 4.845 sampai kurang dari 4.855. Mengembalikan false untuk notasi ilmiah.
+    /// </summary>
+    public static bool TryGetRoundedRange(string? text, out double low, out double high)
+    {
+        low = 0;
+        high = 0;
+
+        string s = (text ?? "").Trim().Replace(',', '.');
+
+        if (s.Length == 0 || s.IndexOfAny(new[] { 'e', 'E' }) >= 0)
+            return false;
+
+        if (!double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out double x))
+            return false;
+
+        int dot = s.IndexOf('.');
+        int decimals = dot < 0 ? 0 : s.Length - dot - 1;
+        decimals = Math.Min(decimals, 8);
+
+        double half = 0.5 * Math.Pow(10, -decimals);
+        low = x - half;
+        high = x + half;
+        return true;
+    }
+
     /// <summary>Ukuran default alignment untuk tipe nilai (Fast Scan).</summary>
     public static int DefaultAlignment(ScanValueType type, bool unicode)
     {
