@@ -180,7 +180,7 @@ internal static class AdvTheme
         return control;
     }
 
-    public static void StyleList(ListView lv)
+    public static void StyleList(ListView lv, bool coloredCells = false)
     {
         lv.View = View.Details;
         lv.FullRowSelect = true;
@@ -210,7 +210,31 @@ internal static class AdvTheme
         };
 
         lv.DrawItem += (s, e) => e.DrawDefault = true;
-        lv.DrawSubItem += (s, e) => e.DrawDefault = true;
+        lv.DrawSubItem += (s, e) =>
+        {
+            if (!coloredCells || e.Item == null || e.SubItem == null)
+            {
+                e.DrawDefault = true;
+                return;
+            }
+
+            // Gambar sendiri agar warna teks per sel (hijau/merah) dihormati.
+            bool selected = e.Item.Selected;
+
+            using (var br = new SolidBrush(selected ? SelectBack : lv.BackColor))
+                e.Graphics.FillRectangle(br, e.Bounds);
+
+            var rect = new Rectangle(e.Bounds.X + 4, e.Bounds.Y, Math.Max(0, e.Bounds.Width - 4), e.Bounds.Height);
+
+            TextRenderer.DrawText(
+                e.Graphics,
+                e.SubItem.Text,
+                lv.Font,
+                rect,
+                selected ? Color.White : e.SubItem.ForeColor,
+                TextFormatFlags.VerticalCenter | TextFormatFlags.Left |
+                TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+        };
     }
 
     public static void StyleGrid(DataGridView g)
