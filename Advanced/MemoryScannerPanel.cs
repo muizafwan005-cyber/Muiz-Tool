@@ -69,11 +69,11 @@ internal sealed class MemoryScannerPanel : UserControl
         var left = new Panel { Dock = DockStyle.Fill, BackColor = AdvTheme.Back };
 
         results = new ListView { Dock = DockStyle.Fill, VirtualMode = true, MultiSelect = true };
-        AdvTheme.StyleList(results);
-        results.Columns.Add("Address", 150);
-        results.Columns.Add("Value", 110);
-        results.Columns.Add("Previous", 110);
-        results.Columns.Add("Type", 70);
+        AdvTheme.StyleList(results, true);
+        results.Columns.Add("Address", 190);
+        results.Columns.Add("Value", 100);
+        results.Columns.Add("Previous", 100);
+        results.Columns.Add("First", 100);
         results.RetrieveVirtualItem += Results_RetrieveVirtualItem;
         results.DoubleClick += (s, e) => AddSelected();
 
@@ -101,7 +101,7 @@ internal sealed class MemoryScannerPanel : UserControl
         left.Controls.Add(targetLabel);
 
         // ---------- kanan: opsi ----------
-        var right = new Panel { Dock = DockStyle.Right, Width = 335, BackColor = AdvTheme.Back };
+        var right = new Panel { Dock = DockStyle.Right, Width = 356, BackColor = AdvTheme.Back, AutoScroll = true };
         int y = 4;
 
         firstBtn = AdvTheme.Btn("First Scan", 104).At(8, y);
@@ -156,23 +156,41 @@ internal sealed class MemoryScannerPanel : UserControl
         stopBox = AdvTheme.Txt(240, "7FFFFFFFFFFF").At(80, y);
         right.Controls.Add(stopBox);
 
-        // Kotak tiga-keadaan seperti Cheat Engine:
-        // dicentang = wajib punya, kosong = dilarang, terisi (■) = bebas.
-        y += 32;
-        writableCheck = AdvTheme.Chk("Writable", true).At(8, y);
-        writableCheck.ThreeState = true;
-        execCheck = AdvTheme.Chk("Executable").At(94, y);
-        execCheck.ThreeState = true;
-        execCheck.CheckState = CheckState.Indeterminate;
-        copyCheck = AdvTheme.Chk("CopyOnWrite").At(188, y);
-        copyCheck.ThreeState = true;
-        copyCheck.CheckState = CheckState.Indeterminate;
-        right.Controls.Add(writableCheck);
-        right.Controls.Add(execCheck);
-        right.Controls.Add(copyCheck);
-        right.Controls.Add(AdvTheme.Lbl("centang = wajib, kosong = dilarang, ■ = bebas", true).At(8, y + 24));
+        // Filter region seperti Cheat Engine (kotak tiga-keadaan). Teks di kanan menjelaskan kondisinya.
+        // Default sama dengan Cheat Engine: Writable wajib, Executable bebas, CopyOnWrite dilarang.
+        y += 30;
+        writableCheck = MakeFilter("Writable", CheckState.Checked, y);
+        y += 26;
+        execCheck = MakeFilter("Executable", CheckState.Indeterminate, y);
+        y += 26;
+        copyCheck = MakeFilter("CopyOnWrite", CheckState.Unchecked, y);
 
-        y += 48;
+        y += 34;
+
+        CheckBox MakeFilter(string text, CheckState initial, int top)
+        {
+            CheckBox box = AdvTheme.Chk(text).At(8, top);
+            box.ThreeState = true;
+            box.CheckState = initial;
+
+            Label info = AdvTheme.Lbl("", true).At(150, top + 2);
+
+            void ShowState()
+            {
+                info.Text = box.CheckState == CheckState.Checked
+                    ? "wajib"
+                    : box.CheckState == CheckState.Unchecked
+                        ? "dilarang"
+                        : "bebas (tidak peduli)";
+            }
+
+            box.CheckStateChanged += (s, e) => ShowState();
+            ShowState();
+
+            right.Controls.Add(box);
+            right.Controls.Add(info);
+            return box;
+        }
         right.Controls.Add(AdvTheme.Lbl("Alignment").At(8, y + 4));
         alignBox = AdvTheme.Txt(50, "4").At(80, y);
         right.Controls.Add(alignBox);
@@ -198,12 +216,12 @@ internal sealed class MemoryScannerPanel : UserControl
         y += 38;
         statusLabel = new Label
         {
-            Location = new Point(8, y),
-            Size = new Size(312, 90),
+            Dock = DockStyle.Bottom,
+            Height = 56,
             ForeColor = AdvTheme.Dim,
             Text = "Pilih process di bagian atas, klik ATTACH, lalu isi Value dan klik First Scan."
         };
-        right.Controls.Add(statusLabel);
+        left.Controls.Add(statusLabel);
 
         Controls.Add(left);
         Controls.Add(right);
@@ -234,6 +252,7 @@ internal sealed class MemoryScannerPanel : UserControl
             refreshTimer.Stop();
             refreshTimer.Dispose();
             cts?.Cancel();
+            scanner.Reset();
         }
 
         base.Dispose(disposing);
@@ -345,7 +364,7 @@ internal sealed class MemoryScannerPanel : UserControl
     {
         if (scanner.IsSnapshot)
         {
-            foundLabel.Text = "Snapshot: " + (scanner.SnapshotBytes / (1024 * 1024)) + " MB (lanjut Next Scan)";
+            foundLabel.Text = "Snapshot siap: " + (scanner.SnapshotBytes / (1024 * 1024)).ToString("N0") + " MB. Pilih tipe Next Scan lalu klik Next Scan.";
             results.VirtualListSize = 0;
         }
         else
@@ -590,21 +609,7 @@ internal sealed class MemoryScannerPanel : UserControl
         if (data == null)
             return "??";
 
-        bool integer = type != ScanValueType.Float &&
-                       type != ScanValueType.Double &&
-                       type != ScanValueType.String;
-
-        if (hex && integer)
-        {
-            ulong v = 0;
-
-            for (int i = 0; i < data.Length && i < 8; i++)
-                v |= (ulong)data[i] << (8 * i);
-
-            return "0x" + v.ToString("X" + (data.Length * 2));
-        }
-
-        return ValueCodec.Format(data, type, scanner.Unicode);
+        return ValueCodec.Format(data, type, scanner.Unicode, null, hex);
     }
 
     private string ReadCurrentText(TargetProcess? t, ulong address)
@@ -621,18 +626,49 @@ internal sealed class MemoryScannerPanel : UserControl
         }
 
         TargetProcess? t = provider.Get();
-        ulong address = scanner.AddressAt(e.ItemIndex);
-        string addressText = t != null ? t.FormatAddress(address) : address.ToString("X8");
-        string previous = ValueCodec.Format(scanner.PreviousAt(e.ItemIndex), scanner.Type, scanner.Unicode);
+        int index = e.ItemIndex;
+        ulong address = scanner.AddressAt(index);
         ScanValueType shown = displayType ?? scanner.Type;
+        bool hex = displayHex || (hexCheck.Checked && ValueCodec.IsInteger(shown));
 
-        e.Item = new ListViewItem(new[]
+        string addressText;
+        bool isStatic = false;
+
+        if (t != null)
         {
-            addressText,
-            ReadText(t, address, shown, displayHex),
-            previous,
-            ValueCodec.Name(shown)
-        });
+            ModuleInfo? module = t.FindModule(address);
+
+            if (module != null)
+            {
+                addressText = module.Name + "+" + (address - module.Base).ToString("X");
+                isStatic = true;
+            }
+            else
+            {
+                addressText = t.FormatAddress(address);
+            }
+        }
+        else
+        {
+            addressText = address.ToString("X8");
+        }
+
+        string current = ReadText(t, address, shown, hex);
+        string previous = ValueCodec.Format(scanner.PreviousAt(index), shown, scanner.Unicode, null, hex);
+        string first = ValueCodec.Format(scanner.FirstAt(index), shown, scanner.Unicode, null, hex);
+
+        var item = new ListViewItem(new[] { addressText, current, previous, first })
+        {
+            UseItemStyleForSubItems = false
+        };
+
+        // Seperti Cheat Engine: alamat static (di dalam module) hijau, nilai yang berubah merah.
+        item.SubItems[0].ForeColor = isStatic ? Color.FromArgb(60, 210, 120) : AdvTheme.Fore;
+        item.SubItems[1].ForeColor = current != previous ? Color.FromArgb(255, 90, 90) : AdvTheme.Fore;
+        item.SubItems[2].ForeColor = AdvTheme.Fore;
+        item.SubItems[3].ForeColor = AdvTheme.Fore;
+
+        e.Item = item;
     }
 
     private void AddSelected()
