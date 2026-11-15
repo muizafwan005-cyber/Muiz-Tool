@@ -58,7 +58,6 @@ internal sealed class ScanLimitException : Exception
 internal sealed class MemoryScanner
 {
     public const int MaxResults = 80_000_000;
-    private const long MaxSnapshotBytes = 768L * 1024 * 1024;
     private const int ChunkSize = 4 * 1024 * 1024;
 
     private sealed class ResultSet
@@ -70,6 +69,7 @@ internal sealed class MemoryScanner
         private readonly List<uint[]> narrow = new List<uint[]>();
         private readonly List<ulong[]> wide = new List<ulong[]>();
         private readonly List<byte[]> values = new List<byte[]>();
+        private readonly List<byte[]> firsts = new List<byte[]>();
 
         public readonly int Stride;
         public readonly bool Wide;
@@ -82,6 +82,12 @@ internal sealed class MemoryScanner
         }
 
         public void Add(ulong address, ReadOnlySpan<byte> value)
+        {
+            Add(address, value, value);
+        }
+
+        /// <summary>value = nilai terakhir (kolom Previous); first = nilai saat First Scan (kolom First).</summary>
+        public void Add(ulong address, ReadOnlySpan<byte> value, ReadOnlySpan<byte> first)
         {
             if (Count >= MaxResults)
             {
@@ -101,6 +107,7 @@ internal sealed class MemoryScanner
                     narrow.Add(new uint[BlockSize]);
 
                 values.Add(new byte[BlockSize * Stride]);
+                firsts.Add(new byte[BlockSize * Stride]);
             }
 
             if (Wide)
@@ -109,6 +116,7 @@ internal sealed class MemoryScanner
                 narrow[block][offset] = unchecked((uint)address);
 
             value.CopyTo(new Span<byte>(values[block], offset * Stride, Stride));
+            first.CopyTo(new Span<byte>(firsts[block], offset * Stride, Stride));
             Count++;
         }
 
@@ -123,18 +131,44 @@ internal sealed class MemoryScanner
         {
             return new ReadOnlySpan<byte>(values[index >> BlockShift], (index & BlockMask) * Stride, Stride);
         }
+
+        public ReadOnlySpan<byte> FirstAt(int index)
+        {
+            return new ReadOnlySpan<byte>(firsts[index >> BlockShift], (index & BlockMask) * Stride, Stride);
+        }
     }
 
     private sealed class SnapChunk
     {
         public ulong Base;
-        public byte[] Data = Array.Empty<byte>();
+        public int Length;
+        public long Offset;
+    }
+
+    /// <summary>Salinan memori untuk Unknown Initial Value, disimpan di file sementara.</summary>
+    private sealed class SnapshotFile : IDisposable
+    {
+        public string Path = "";
+        public readonly List<SnapChunk> Chunks = new List<SnapChunk>();
+        public long Bytes;
+
+        public void Dispose()
+        {
+            try
+            {
+                if (File.Exists(Path))
+                    File.Delete(Path);
+            }
+            catch
+            {
+            }
+        }
     }
 
     private sealed class State
     {
         public ResultSet? Results;
-        public List<SnapChunk>? Snapshot;
+        public SnapshotFile? Snapshot;
         public ScanValueType Type;
         public int Size;
         public bool Unicode;
@@ -159,27 +193,47 @@ internal sealed class MemoryScanner
     public int LastRegionCount { get; private set; }
     public long LastScannedBytes { get; private set; }
 
-    public long SnapshotBytes
-    {
-        get
-        {
-            long total = 0;
-
-            if (current?.Snapshot != null)
-            {
-                foreach (SnapChunk c in current.Snapshot)
-                    total += c.Data.Length;
-            }
-
-            return total;
-        }
-    }
+    public long SnapshotBytes => current?.Snapshot?.Bytes ?? 0;
 
     public void Reset()
     {
+        DisposeState(current);
+        DisposeState(undo);
+
         current = null;
         undo = null;
         hasUndo = false;
+    }
+
+    private static void DisposeState(State? state)
+    {
+        state?.Snapshot?.Dispose();
+    }
+
+    private static bool staleCleaned;
+
+    private static string NewSnapshotPath()
+    {
+        string dir = System.IO.Path.GetTempPath();
+
+        if (!staleCleaned)
+        {
+            staleCleaned = true;
+
+            try
+            {
+                foreach (string file in Directory.GetFiles(dir, "muiz_snap_*.tmp"))
+                {
+                    if (File.GetLastWriteTimeUtc(file) < DateTime.UtcNow.AddHours(-12))
+                        File.Delete(file);
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        return System.IO.Path.Combine(dir, "muiz_snap_" + Guid.NewGuid().ToString("N") + ".tmp");
     }
 
     public void Undo()
@@ -187,9 +241,13 @@ internal sealed class MemoryScanner
         if (!hasUndo)
             return;
 
+        State? discarded = current;
+
         current = undo;
         undo = null;
         hasUndo = false;
+
+        DisposeState(discarded);
     }
 
     public ulong AddressAt(int index)
@@ -216,7 +274,7 @@ internal sealed class MemoryScanner
         for (int i = 0; i < src.Count; i++)
         {
             if (!drop.Contains(i))
-                rs.Add(src.AddrAt(i), src.ValueAt(i));
+                rs.Add(src.AddrAt(i), src.ValueAt(i), src.FirstAt(i));
         }
 
         int removed = src.Count - rs.Count;
@@ -235,6 +293,11 @@ internal sealed class MemoryScanner
         return removed;
     }
 
+    public byte[] FirstAt(int index)
+    {
+        return current!.Results!.FirstAt(index).ToArray();
+    }
+
     public byte[] PreviousAt(int index)
     {
         return current!.Results!.ValueAt(index).ToArray();
@@ -242,9 +305,13 @@ internal sealed class MemoryScanner
 
     private void Commit(State next)
     {
+        State? dropped = undo;
+
         undo = current;
         hasUndo = true;
         current = next;
+
+        DisposeState(dropped);
     }
 
     // ---------------------------------------------------------
@@ -377,45 +444,47 @@ internal sealed class MemoryScanner
             if (spec.Type == ScanValueType.String)
                 throw new InvalidOperationException("Unknown Initial Value tidak tersedia untuk String.");
 
-            // Unknown Initial Value: simpan salinan memori, bandingkan di Next Scan.
-            var chunks = new List<SnapChunk>();
-            long bytes = 0;
+            // Unknown Initial Value: salin memori ke file sementara (tanpa batas RAM, seperti
+            // Cheat Engine), lalu bandingkan di Next Scan.
+            var snap = new SnapshotFile { Path = NewSnapshotPath() };
 
-            foreach (AddrRange r in ranges)
+            try
             {
-                ulong pos = r.Lo;
-
-                while (pos < r.Hi)
+                using (var fs = new FileStream(snap.Path, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 20))
                 {
-                    ct.ThrowIfCancellationRequested();
+                    byte[] data = new byte[ChunkSize];
 
-                    int want = (int)Math.Min((ulong)ChunkSize, r.Hi - pos);
-                    byte[] data = new byte[want];
-                    t.TryRead(pos, data, want, out int got);
-
-                    if (got >= size)
+                    foreach (AddrRange r in ranges)
                     {
-                        if (got < want)
-                            Array.Resize(ref data, got);
+                        ulong pos = r.Lo;
 
-                        chunks.Add(new SnapChunk { Base = pos, Data = data });
-                        bytes += got;
-
-                        if (bytes > MaxSnapshotBytes)
+                        while (pos < r.Hi)
                         {
-                            throw new ScanLimitException(
-                                "Memori terlalu besar untuk Unknown Initial Value (batas " +
-                                (MaxSnapshotBytes / (1024 * 1024)) +
-                                " MB). Persempit rentang alamat atau pilih Writable saja.");
+                            ct.ThrowIfCancellationRequested();
+
+                            int want = (int)Math.Min((ulong)ChunkSize, r.Hi - pos);
+                            t.TryRead(pos, data, want, out int got);
+
+                            if (got >= size)
+                            {
+                                fs.Write(data, 0, got);
+                                snap.Chunks.Add(new SnapChunk { Base = pos, Length = got, Offset = snap.Bytes });
+                                snap.Bytes += got;
+                            }
+
+                            pos += (ulong)want;
+                            Tick(want);
                         }
                     }
-
-                    pos += (ulong)want;
-                    Tick(want);
                 }
             }
+            catch
+            {
+                snap.Dispose();
+                throw;
+            }
 
-            next.Snapshot = chunks;
+            next.Snapshot = snap;
         }
 
         progress?.Invoke(100);
@@ -804,36 +873,40 @@ internal sealed class MemoryScanner
 
         if (state.Snapshot != null)
         {
-            List<SnapChunk> chunks = state.Snapshot;
+            SnapshotFile snap = state.Snapshot;
             byte[] buffer = new byte[ChunkSize];
+            byte[] saved = new byte[ChunkSize];
             int n = 0;
 
-            foreach (SnapChunk c in chunks)
+            using (var fs = new FileStream(snap.Path, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 20))
             {
-                ct.ThrowIfCancellationRequested();
-
-                int len = c.Data.Length;
-                t.TryRead(c.Base, buffer, len, out int got);
-                int readable = Math.Min(got, len);
-
-                if (readable >= size)
+                foreach (SnapChunk c in snap.Chunks)
                 {
-                    int first = (int)(((ulong)state.Align - (c.Base % (ulong)state.Align)) % (ulong)state.Align);
+                    ct.ThrowIfCancellationRequested();
 
-                    for (int i = first; i + size <= readable; i += state.Align)
+                    fs.Seek(c.Offset, SeekOrigin.Begin);
+                    fs.ReadExactly(saved, 0, c.Length);
+
+                    t.TryRead(c.Base, buffer, c.Length, out int got);
+                    int readable = Math.Min(got, c.Length);
+
+                    if (readable >= size)
                     {
-                        var cur = new ReadOnlySpan<byte>(buffer, i, size);
-                        var old = new ReadOnlySpan<byte>(c.Data, i, size);
+                        int first = (int)(((ulong)state.Align - (c.Base % (ulong)state.Align)) % (ulong)state.Align);
 
-                        if (Match(mode, state.Type, cur, old, value, state.IgnoreCase, rounded, low, high))
-                            rs.Add(c.Base + (ulong)i, cur);
+                        for (int i = first; i + size <= readable; i += state.Align)
+                        {
+                            var cur = new ReadOnlySpan<byte>(buffer, i, size);
+                            var old = new ReadOnlySpan<byte>(saved, i, size);
+
+                            if (Match(mode, state.Type, cur, old, value, state.IgnoreCase, rounded, low, high))
+                                rs.Add(c.Base + (ulong)i, cur, old);
+                        }
                     }
+
+                    n++;
+                    progress?.Invoke((int)(n * 100L / snap.Chunks.Count));
                 }
-
-                n++;
-
-                if (progress != null)
-                    progress((int)(n * 100L / chunks.Count));
             }
         }
         else
@@ -873,7 +946,7 @@ internal sealed class MemoryScanner
                         var cur = new ReadOnlySpan<byte>(window, off, size);
 
                         if (Match(mode, state.Type, cur, src.ValueAt(k), value, state.IgnoreCase, rounded, low, high))
-                            rs.Add(src.AddrAt(k), cur);
+                            rs.Add(src.AddrAt(k), cur, src.FirstAt(k));
                     }
                 }
                 else
@@ -886,7 +959,7 @@ internal sealed class MemoryScanner
                         var cur = new ReadOnlySpan<byte>(single, 0, size);
 
                         if (Match(mode, state.Type, cur, src.ValueAt(k), value, state.IgnoreCase, rounded, low, high))
-                            rs.Add(src.AddrAt(k), cur);
+                            rs.Add(src.AddrAt(k), cur, src.FirstAt(k));
                     }
                 }
 
