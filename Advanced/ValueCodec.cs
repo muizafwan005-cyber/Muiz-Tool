@@ -219,10 +219,14 @@ internal static class ValueCodec
             return false;
         }
 
+        // Seperti Cheat Engine: nilai HEX yang lebih panjang dari tipe dipotong ke byte rendah
+        // (mis. 48E9EFC8 pada 2 Bytes menjadi EFC8). Nilai desimal tetap diperiksa jangkauannya.
+        bool truncate = hex || s.StartsWith("0x", StringComparison.OrdinalIgnoreCase);
+
         switch (type)
         {
             case ScanValueType.Byte:
-                if (v < -128 || v > 255)
+                if (!truncate && (v < -128 || v > 255))
                 {
                     error = "Nilai Byte harus -128 sampai 255.";
                     return false;
@@ -232,7 +236,7 @@ internal static class ValueCodec
                 return true;
 
             case ScanValueType.Int16:
-                if (v < short.MinValue || v > ushort.MaxValue)
+                if (!truncate && (v < short.MinValue || v > ushort.MaxValue))
                 {
                     error = "Nilai 2 Bytes harus -32768 sampai 65535.";
                     return false;
@@ -242,7 +246,7 @@ internal static class ValueCodec
                 return true;
 
             case ScanValueType.Int32:
-                if (v < int.MinValue || v > uint.MaxValue)
+                if (!truncate && (v < int.MinValue || v > uint.MaxValue))
                 {
                     error = "Nilai 4 Bytes di luar jangkauan.";
                     return false;
