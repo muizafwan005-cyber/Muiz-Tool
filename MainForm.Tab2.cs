@@ -868,6 +868,8 @@ public sealed partial class MainForm
 
         y += 34;
 
+        BuildScrollWheelControls(panel, ref y);
+
         scrollZoomInitializeCheck.CheckedChanged +=
             ScrollZoomInitializeCheck_CheckedChanged;
 
@@ -879,6 +881,8 @@ public sealed partial class MainForm
 
         scrollZoomFreezeTimer.Tick +=
             ScrollZoomFreezeTimer_Tick;
+
+        WireScrollWheelEvents();
     }
 
     private void ScrollZoomInitializeCheck_CheckedChanged(
@@ -1119,6 +1123,8 @@ public sealed partial class MainForm
         // Freeze tepat di bawah trackbar
         scrollZoomFreezeCheck.Top =
             scrollZoomTrackBar.Bottom + 2;
+
+        PositionScrollWheelControls();
     }
 
     private void SetScrollZoomPosition(bool combineVisible)
