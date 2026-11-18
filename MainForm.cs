@@ -470,16 +470,6 @@ public sealed partial class MainForm : Form
         
         BuildTab5(tab5);
         
-                Controls.Add(
-                    tabs);
-        
-                Controls.Add(
-                    topPanel);
-        
-                ResumeLayout(
-                    false);
-            }
-            
         // =====================================================
         // TAB 6 - RF CLICKER
         // =====================================================
@@ -494,6 +484,17 @@ public sealed partial class MainForm : Form
         tabs.TabPages.Add(tab6);
         
         BuildTab6(tab6);
+        
+                Controls.Add(
+                    tabs);
+        
+                Controls.Add(
+                    topPanel);
+        
+                ResumeLayout(
+                    false);
+            }
+            
 
     // =========================================================
     // 5. PROCESS, ATTACH & DETACH
