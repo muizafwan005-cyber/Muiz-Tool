@@ -164,7 +164,7 @@ public sealed partial class MainForm
         }
 
         // START / STOP
-        var stopButton = new Button
+        rfClickerStopButton = new Button
         {
             Text = "STOP",
             Location = new Point(8, 335),
@@ -174,11 +174,11 @@ public sealed partial class MainForm
             ForeColor = ForeColorMain,
             Enabled = false
         };
+        
+        rfClickerStopButton.FlatAppearance.BorderSize = 0;
+        root.Controls.Add(rfClickerStopButton);
 
-        stopButton.FlatAppearance.BorderSize = 0;
-        root.Controls.Add(stopButton);
-
-        var startButton = new Button
+        rfClickerStartButton = new Button
         {
             Text = "START",
             Location = new Point(151, 335),
@@ -188,9 +188,9 @@ public sealed partial class MainForm
             ForeColor = ForeColorMain,
             Enabled = false
         };
-
-        startButton.FlatAppearance.BorderSize = 0;
-        root.Controls.Add(startButton);
+        
+        rfClickerStartButton.FlatAppearance.BorderSize = 0;
+        root.Controls.Add(rfClickerStartButton);
 
         // STATUS
         rfClickerStatusLabel = new Label
