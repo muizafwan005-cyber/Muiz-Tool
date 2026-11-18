@@ -18,10 +18,10 @@ public sealed partial class MainForm
 
     private Label rfClickerStatusLabel = null!;
     private readonly RFClickerEngine rfClickerEngine = new();
-    
+
     private Button rfClickerStartButton = null!;
     private Button rfClickerStopButton = null!;
-    
+
     private void BuildTab6(TabPage tab)
     {
         var root = new Panel
@@ -88,18 +88,16 @@ public sealed partial class MainForm
                 TabStop = true
             };
 
-            hotkeyBox.KeyDown +=
-                (_, e) =>
-                {
-                    string keyName =
-                        GetRFClickerKeyName(e);
+            hotkeyBox.KeyDown += (_, e) =>
+            {
+                string keyName = GetRFClickerKeyName(e);
 
-                    if (!string.IsNullOrEmpty(keyName))
-                        hotkeyBox.Text = keyName;
+                if (!string.IsNullOrEmpty(keyName))
+                    hotkeyBox.Text = keyName;
 
-                    e.SuppressKeyPress = true;
-                    e.Handled = true;
-                };
+                e.SuppressKeyPress = true;
+                e.Handled = true;
+            };
 
             hotkeyBox.Enter += (_, _) =>
             {
@@ -113,7 +111,6 @@ public sealed partial class MainForm
             };
 
             group.Controls.Add(hotkeyBox);
-
             rfClickerHotkeyBoxes.Add(hotkeyBox);
 
             var clearButton = new Button
@@ -149,7 +146,6 @@ public sealed partial class MainForm
             };
 
             group.Controls.Add(delayInput);
-
             rfClickerDelayInputs.Add(delayInput);
 
             var msLabel = new Label
@@ -163,7 +159,7 @@ public sealed partial class MainForm
             group.Controls.Add(msLabel);
         }
 
-        // START / STOP
+        // STOP BUTTON
         rfClickerStopButton = new Button
         {
             Text = "STOP",
@@ -174,10 +170,16 @@ public sealed partial class MainForm
             ForeColor = ForeColorMain,
             Enabled = false
         };
-        
+
         rfClickerStopButton.FlatAppearance.BorderSize = 0;
         root.Controls.Add(rfClickerStopButton);
 
+        rfClickerStopButton.Click += (_, _) =>
+        {
+            StopRFClicker();
+        };
+
+        // START BUTTON
         rfClickerStartButton = new Button
         {
             Text = "START",
@@ -188,9 +190,14 @@ public sealed partial class MainForm
             ForeColor = ForeColorMain,
             Enabled = false
         };
-        
+
         rfClickerStartButton.FlatAppearance.BorderSize = 0;
         root.Controls.Add(rfClickerStartButton);
+
+        rfClickerStartButton.Click += (_, _) =>
+        {
+            StartRFClicker();
+        };
 
         // STATUS
         rfClickerStatusLabel = new Label
@@ -202,6 +209,128 @@ public sealed partial class MainForm
         };
 
         root.Controls.Add(rfClickerStatusLabel);
+
+        UpdateRFClickerButtons();
+    }
+
+    // =====================================================
+    // START RF CLICKER
+    // =====================================================
+
+    private void StartRFClicker()
+    {
+        try
+        {
+            if (!IsAttached() || selectedProcess == null)
+            {
+                throw new InvalidOperationException(
+                    "Attach RF Online terlebih dahulu.");
+            }
+
+            if (selectedProcess.HasExited)
+            {
+                throw new InvalidOperationException(
+                    "Process RF Online sudah berhenti.");
+            }
+
+            IntPtr targetWindow =
+                selectedProcess.MainWindowHandle;
+
+            if (targetWindow == IntPtr.Zero)
+            {
+                throw new InvalidOperationException(
+                    "Handle jendela RF Online tidak valid.");
+            }
+
+            var bindings =
+                new List<RFClickerEngine.ClickerBinding>();
+
+            for (int i = 0; i < rfClickerHotkeyBoxes.Count; i++)
+            {
+                string hotkey =
+                    rfClickerHotkeyBoxes[i].Text.Trim();
+
+                int delay =
+                    (int)rfClickerDelayInputs[i].Value;
+
+                if (string.IsNullOrWhiteSpace(hotkey))
+                    continue;
+
+                bindings.Add(
+                    new RFClickerEngine.ClickerBinding(
+                        hotkey,
+                        delay));
+            }
+
+            rfClickerEngine.Start(
+                targetWindow,
+                bindings);
+
+            rfClickerStatusLabel.Text =
+                "Status: Running";
+
+            rfClickerStatusLabel.ForeColor =
+                Color.LightGreen;
+
+            UpdateRFClickerButtons();
+        }
+        catch (Exception ex)
+        {
+            rfClickerStatusLabel.Text =
+                $"Status: {ex.Message}";
+
+            rfClickerStatusLabel.ForeColor =
+                Color.OrangeRed;
+
+            UpdateRFClickerButtons();
+        }
+    }
+
+    // =====================================================
+    // STOP RF CLICKER
+    // =====================================================
+
+    private void StopRFClicker()
+    {
+        rfClickerEngine.Stop();
+
+        rfClickerStatusLabel.Text =
+            "Status: Stopped";
+
+        rfClickerStatusLabel.ForeColor =
+            ForeColorDim;
+
+        UpdateRFClickerButtons();
+    }
+
+    // =====================================================
+    // UPDATE START / STOP BUTTON
+    // =====================================================
+
+    private void UpdateRFClickerButtons()
+    {
+        bool canStart = false;
+
+        try
+        {
+            canStart =
+                IsAttached() &&
+                selectedProcess != null &&
+                !selectedProcess.HasExited &&
+                selectedProcess.MainWindowHandle != IntPtr.Zero;
+        }
+        catch
+        {
+            canStart = false;
+        }
+
+        bool running = rfClickerEngine.IsRunning;
+
+        rfClickerStartButton.Enabled =
+            canStart && !running;
+
+        rfClickerStopButton.Enabled =
+            running;
     }
 
     // =====================================================
