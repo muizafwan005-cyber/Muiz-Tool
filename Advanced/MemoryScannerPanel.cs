@@ -286,11 +286,16 @@ internal sealed class MemoryScannerPanel : UserControl
         return i >= 0 && i < modes.Length ? modes[i] : ScanMode.Exact;
     }
 
+
     private void RebuildScanTypes()
     {
+        // Simpan pilihan Scan Type sebelum ComboBox dibangun ulang.
+        ScanMode previousMode = SelectedMode();
+    
         bool isString = SelectedType() == ScanValueType.String;
+    
         scanTypeCombo.Items.Clear();
-
+    
         if (!scanner.HasScan)
         {
             if (isString)
@@ -312,16 +317,29 @@ internal sealed class MemoryScannerPanel : UserControl
         }
         else
         {
-            modes = new[] { ScanMode.Exact, ScanMode.Increased, ScanMode.Decreased, ScanMode.Unchanged, ScanMode.Changed };
+            modes = new[]
+            {
+                ScanMode.Exact,
+                ScanMode.Increased,
+                ScanMode.Decreased,
+                ScanMode.Unchanged,
+                ScanMode.Changed
+            };
+    
             scanTypeCombo.Items.Add("Exact Value");
             scanTypeCombo.Items.Add("Increased Value");
             scanTypeCombo.Items.Add("Decreased Value");
             scanTypeCombo.Items.Add("Unchanged Value");
             scanTypeCombo.Items.Add("Changed Value");
         }
-
-        scanTypeCombo.SelectedIndex = 0;
+    
+        // Pulihkan pilihan sebelumnya jika masih tersedia.
+        int selectedIndex = Array.IndexOf(modes, previousMode);
+    
+        scanTypeCombo.SelectedIndex =
+            selectedIndex >= 0 ? selectedIndex : 0;
     }
+
 
     private void OnValueTypeChanged()
     {
