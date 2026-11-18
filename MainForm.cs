@@ -655,6 +655,8 @@ public sealed partial class MainForm : Form
 
             attachButton.Text =
                 "ATTACHED";
+                
+            UpdateRFClickerButtons();
         }
         catch (Exception ex)
         {
@@ -671,6 +673,24 @@ public sealed partial class MainForm : Form
 
     private void DetachCurrent()
     {
+            // Stop RF Clicker sebelum detach process
+        rfClickerEngine.Stop();
+        
+        if (rfClickerStatusLabel != null)
+        {
+            rfClickerStatusLabel.Text =
+                "Status: Not attached";
+        
+            rfClickerStatusLabel.ForeColor =
+                ForeColorDim;
+        }
+        
+        if (rfClickerStartButton != null)
+            rfClickerStartButton.Enabled = false;
+        
+        if (rfClickerStopButton != null)
+            rfClickerStopButton.Enabled = false;
+            
         advanced?.OnDetach();
 
         freezeTimer.Stop();
