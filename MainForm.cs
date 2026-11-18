@@ -479,6 +479,21 @@ public sealed partial class MainForm : Form
                 ResumeLayout(
                     false);
             }
+            
+        // =====================================================
+        // TAB 6 - RF CLICKER
+        // =====================================================
+        
+        var tab6 = new TabPage
+        {
+            Text = "RF CLICKER",
+            BackColor = BackColorMain,
+            ForeColor = ForeColorMain
+        };
+        
+        tabs.TabPages.Add(tab6);
+        
+        BuildTab6(tab6);
 
     // =========================================================
     // 5. PROCESS, ATTACH & DETACH
