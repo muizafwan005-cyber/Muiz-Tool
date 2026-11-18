@@ -17,7 +17,11 @@ public sealed partial class MainForm
     private readonly List<NumericUpDown> rfClickerDelayInputs = new();
 
     private Label rfClickerStatusLabel = null!;
-
+    private readonly RFClickerEngine rfClickerEngine = new();
+    
+    private Button rfClickerStartButton = null!;
+    private Button rfClickerStopButton = null!;
+    
     private void BuildTab6(TabPage tab)
     {
         var root = new Panel
