@@ -74,6 +74,24 @@ public class AddressEntry : INotifyPropertyChanged
         set { if (signed != value) { signed = value; Raise(); } }
     }
 
+    public const string ScriptTypeName = "Auto Assembler Script";
+
+    /// <summary>Jika diisi, entri ini adalah script Auto Assemble (file di folder scripts).</summary>
+    public string ScriptPath { get; set; } = "";
+
+    /// <summary>Salinan isi script (dipakai jika file tidak ada, mis. dari Cheat Table).</summary>
+    public string ScriptText { get; set; } = "";
+
+    [JsonIgnore]
+    public bool IsScript => (ScriptPath ?? "").Length > 0 || (ScriptText ?? "").Length > 0;
+
+    /// <summary>Kunci sesi Auto Assemble: path file, atau id unik untuk script tanpa file.</summary>
+    [JsonIgnore]
+    public string ScriptKey =>
+        (ScriptPath ?? "").Length > 0
+            ? ScriptPath!
+            : "entry:" + RuntimeHelpers.GetHashCode(this);
+
     /// <summary>Status mesin Freeze (tidak disimpan ke JSON).</summary>
     [JsonIgnore]
     public string Status { get; set; } = "";
