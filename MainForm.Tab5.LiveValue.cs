@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Windows.Forms;
 using RFTool.Advanced;
@@ -54,12 +55,25 @@ public sealed partial class MainForm
         for (int i = first; i <= last; i++)
         {
             AddressEntry entry = addressManager.Entries[i];
+            string text;
 
-            string text = entry.IsScript
-                ? (AdvSvc.IsAaActive(entry.ScriptKey) ? "ENABLED" : "disabled")
-                : target == null
-                    ? "??"
-                    : ReadLiveValue(target, entry);
+            if (entry.IsScript)
+            {
+                text = AdvSvc.IsAaActive(entry.ScriptKey) ? "ENABLED" : "disabled";
+            }
+            else if (target == null)
+            {
+                UpdatePointerDisplay(entry, i, null);
+                text = "??";
+            }
+            else
+            {
+                bool resolved = EntryIO.TryResolve(target, entry, out ulong address, out _);
+
+                UpdatePointerDisplay(entry, i, resolved ? target.FormatAddress(address) : null);
+
+                text = resolved ? ReadLiveValue(target, entry, address) : "??";
+            }
 
             DataGridViewCell cell = addressGrid.Rows[i].Cells["Live"];
 
@@ -68,13 +82,10 @@ public sealed partial class MainForm
         }
     }
 
-    private static string ReadLiveValue(TargetProcess target, AddressEntry entry)
+    private static string ReadLiveValue(TargetProcess target, AddressEntry entry, ulong address)
     {
         try
         {
-            if (!EntryIO.TryResolve(target, entry, out ulong address, out _))
-                return "??";
-
             ScanValueType type = ValueCodec.TypeFromName(entry.ValueType);
 
             if (type == ScanValueType.String)
@@ -120,5 +131,94 @@ public sealed partial class MainForm
         int nul = text.IndexOf('\0');
 
         return nul >= 0 ? text.Substring(0, nul) : text;
+    }
+
+    // =========================================================
+    // TAMPILAN KOLOM ADDRESS (seperti Cheat Engine)
+    // Pointer  -> "P->alamat tujuan" (di-resolve live)
+    // Lainnya  -> teks address apa adanya
+    // Teks asli (ekspresi pointer) tampil sebagai tooltip.
+    // =========================================================
+
+    private sealed class AddressDisplay
+    {
+        public string Expression = "";
+        public bool IsPointer;
+        public string Text = "";
+    }
+
+    private readonly ConditionalWeakTable<AddressEntry, AddressDisplay> addressDisplays = new();
+
+    private AddressDisplay GetAddressDisplay(AddressEntry entry)
+    {
+        AddressDisplay d = addressDisplays.GetOrCreateValue(entry);
+        string expression = entry.Address ?? "";
+
+        if (d.Text.Length == 0 || d.Expression != expression)
+        {
+            d.Expression = expression;
+            d.IsPointer = PointerExpression.TryParse(expression, out _, out _);
+            d.Text = d.IsPointer ? "P->????????" : expression;
+        }
+
+        return d;
+    }
+
+    private void UpdatePointerDisplay(AddressEntry entry, int rowIndex, string? resolvedHex)
+    {
+        AddressDisplay d = GetAddressDisplay(entry);
+
+        if (!d.IsPointer)
+            return;
+
+        string text = "P->" + (resolvedHex ?? "????????");
+
+        if (d.Text == text)
+            return;
+
+        d.Text = text;
+
+        DataGridViewColumn? column = addressGrid.Columns["Address"];
+
+        if (column != null)
+            addressGrid.InvalidateCell(column.Index, rowIndex);
+    }
+
+    private void AddressGrid_CellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
+    {
+        if (e.RowIndex < 0 ||
+            e.RowIndex >= addressManager.Entries.Count ||
+            addressGrid.Columns[e.ColumnIndex].Name != "Address")
+        {
+            return;
+        }
+
+        AddressEntry entry = addressManager.Entries[e.RowIndex];
+
+        if (entry.IsScript)
+            return;
+
+        AddressDisplay d = GetAddressDisplay(entry);
+
+        if (d.IsPointer)
+        {
+            e.Value = d.Text;
+            e.FormattingApplied = true;
+        }
+    }
+
+    private void AddressGrid_CellToolTipTextNeeded(object? sender, DataGridViewCellToolTipTextNeededEventArgs e)
+    {
+        if (e.RowIndex < 0 ||
+            e.RowIndex >= addressManager.Entries.Count ||
+            addressGrid.Columns[e.ColumnIndex].Name != "Address")
+        {
+            return;
+        }
+
+        AddressEntry entry = addressManager.Entries[e.RowIndex];
+
+        if (!entry.IsScript)
+            e.ToolTipText = entry.Address;
     }
 }
