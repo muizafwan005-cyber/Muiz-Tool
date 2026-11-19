@@ -63,6 +63,8 @@ public sealed partial class MainForm
         AddAddressButton(toolbar, "SAVE", SaveAddresses);
         AddAddressButton(toolbar, "LOAD", LoadAddresses);
 
+            AddAddressButton(toolbar, "LOAD CT", LoadCheatTable, 80);
+
         // =====================================================
         // ADDRESS GRID
         // =====================================================
@@ -128,11 +130,19 @@ public sealed partial class MainForm
         
         addressGrid.Columns.Add(new DataGridViewTextBoxColumn
         {
-            Name = "Value",
+            Name = "Live",
             HeaderText = "Value",
+            ReadOnly = true,
+            FillWeight = 90
+        });
+
+        addressGrid.Columns.Add(new DataGridViewTextBoxColumn
+        {
+            Name = "Value",
+            HeaderText = "Target",
             DataPropertyName = "Value",
             ReadOnly = true,
-            FillWeight = 75
+            FillWeight = 70
         });
         
         addressGrid.Columns.Add(new DataGridViewTextBoxColumn
@@ -186,6 +196,7 @@ public sealed partial class MainForm
         layout.Controls.Add(addressInfoLabel, 0, 2);
 
         EnsureAddressInfoTimer();
+        EnsureAddressLiveTimer();
     }
     // =========================================================
     // TOOLBAR BUTTON
@@ -194,12 +205,13 @@ public sealed partial class MainForm
     private void AddAddressButton(
         FlowLayoutPanel toolbar,
         string text,
-        Action action)
+        Action action,
+        int width = 66)
     {
         var button = new Button
         {
             Text = text,
-            Width = 66,
+            Width = width,
             Height = 30,
             Margin = new Padding(2, 3, 2, 2),
             FlatStyle = FlatStyle.Flat,
