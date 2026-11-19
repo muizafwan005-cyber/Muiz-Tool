@@ -22,6 +22,8 @@ public sealed partial class MainForm
             "Float", "Double", "String", "Array of byte"
         };
 
+    private int ctImportedScripts;
+
     private void LoadCheatTable()
     {
         using var dialog = new OpenFileDialog
@@ -49,6 +51,7 @@ public sealed partial class MainForm
             }
 
             int added = 0;
+            ctImportedScripts = 0;
             var skipped = new List<string>();
 
             ImportCtEntries(root, "Default", ref added, skipped);
@@ -59,14 +62,15 @@ public sealed partial class MainForm
                 "Load CT: " + added + " address dimuat, " +
                 skipped.Count + " dilewati.";
 
-            string msg = added + " address dimuat dari CT.";
+            string msg = added + " entri dimuat dari CT" +
+                         (ctImportedScripts > 0 ? " (termasuk " + ctImportedScripts + " script)." : ".");
 
             if (skipped.Count > 0)
             {
                 int show = Math.Min(10, skipped.Count);
 
                 msg += "\n\n" + skipped.Count +
-                       " entry dilewati (script / tipe tidak didukung / alamat tidak valid):\n- " +
+                       " entry dilewati (tipe tidak didukung / alamat tidak valid):\n- " +
                        string.Join("\n- ", skipped.GetRange(0, show));
 
                 if (skipped.Count > show)
@@ -116,9 +120,29 @@ public sealed partial class MainForm
 
             string type = (e.Element("VariableType")?.Value ?? "4 Bytes").Trim();
 
-            // Auto Assembler script dan tipe lain (Binary, Pointer, dst) dilewati
-            if (e.Element("AssemblerScript") != null ||
-                !CtSupportedTypes.Contains(type))
+            // Auto Assembler script -> entri script (Freeze = Enable/Disable)
+            string? scriptText = e.Element("AssemblerScript")?.Value;
+
+            if (!string.IsNullOrWhiteSpace(scriptText))
+            {
+                addressManager.Add(new AddressEntry
+                {
+                    Description = desc,
+                    Address = "(script)",
+                    ValueType = AddressEntry.ScriptTypeName,
+                    Value = "",
+                    Group = group,
+                    ScriptText = scriptText.Trim(),
+                    Freeze = false
+                });
+
+                added++;
+                ctImportedScripts++;
+                continue;
+            }
+
+            // Tipe lain (Binary, Pointer, dst) dilewati
+            if (!CtSupportedTypes.Contains(type))
             {
                 skipped.Add(desc + " [" + type + "]");
                 continue;
