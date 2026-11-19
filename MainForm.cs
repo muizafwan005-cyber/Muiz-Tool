@@ -341,6 +341,52 @@ public sealed partial class MainForm : Form
 
         topPanel.Controls.Add(basePointerLockButton);
 
+        // Base Pointer khusus Private Advance ditampilkan sejajar dengan Base Pointer utama.
+        var privateAdvanceBasePointerLabel = new Label
+        {
+            Text = "PRIVATE ADVANCE BASE POINTER",
+            AutoSize = true,
+            Location = new Point(340, 57),
+            ForeColor = ForeColorDim
+        };
+        topPanel.Controls.Add(privateAdvanceBasePointerLabel);
+
+        privateAdvanceBasePointerTextBox = new TextBox
+        {
+            Text = $"{PrivateAdvanceModuleName}+{PrivateAdvanceBaseOffset:X8}",
+            Location = new Point(340, 74),
+            Size = new Size(300, 25),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+            BackColor = BackColorInput,
+            ForeColor = ForeColorMain
+        };
+        topPanel.Controls.Add(privateAdvanceBasePointerTextBox);
+
+        privateAdvanceSaveBasePointerButton = new Button
+        {
+            Text = "SAVE",
+            Location = new Point(650, 73),
+            Size = new Size(65, 27),
+            Anchor = AnchorStyles.Top | AnchorStyles.Right,
+            FlatStyle = FlatStyle.Flat,
+            BackColor = BackColorInput,
+            ForeColor = ForeColorMain
+        };
+        privateAdvanceSaveBasePointerButton.FlatAppearance.BorderSize = 0;
+        privateAdvanceSaveBasePointerButton.Click += (_, _) => SavePrivateAdvanceBasePointer();
+        topPanel.Controls.Add(privateAdvanceSaveBasePointerButton);
+
+        privateAdvanceBasePointerStatusLabel = new Label
+        {
+            AutoSize = false,
+            Location = new Point(340, 104),
+            Size = new Size(480, 18),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+            ForeColor = ForeColorDim,
+            Text = "Private Advance Base Pointer: belum divalidasi"
+        };
+        topPanel.Controls.Add(privateAdvanceBasePointerStatusLabel);
+
         // Saat aplikasi dibuka, Base Pointer selalu terkunci.
         SetBasePointerLocked(true);
 
