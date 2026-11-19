@@ -1,7 +1,8 @@
+
 using System;
-using System.Drawing;
 using System.Globalization;
 using System.Windows.Forms;
+using System.Drawing;
 using RFTool.PrivateAdvance.Config;
 
 namespace RFTool;
@@ -11,92 +12,25 @@ public sealed partial class MainForm
     private const string PrivateAdvanceModuleName = "RF_Online.bin";
     private const long PrivateAdvanceBaseOffset = 0x01F8CFBC;
 
-    private Label? privateAdvanceProcessStatusLabel;
     private Label? privateAdvanceBasePointerStatusLabel;
     private TextBox? privateAdvanceBasePointerTextBox;
     private Button? privateAdvanceSaveBasePointerButton;
+
     private bool privateAdvanceBasePointerSaved;
     private bool privateAdvanceBasePointerValidForSession;
 
-    // Tab 7: konfigurasi Base Pointer terpisah dari Base Pointer fitur Muiz Tool.
+    // Tab 7 hanya menyediakan area kosong untuk fitur berikutnya.
     private void BuildTab7(TabPage tab)
     {
-        var panel = new Panel
+        LoadPrivateAdvanceBasePointer();
+
+        tab.Controls.Add(new Panel
         {
             Dock = DockStyle.Fill,
             AutoScroll = true,
-            Padding = new Padding(12),
             BackColor = BackColorMain
-        };
-
-        panel.Controls.Add(new Label
-        {
-            Text = "PRIVATE ADVANCE",
-            AutoSize = true,
-            Font = new Font("Segoe UI", 13F, FontStyle.Bold),
-            ForeColor = ForeColorMain,
-            Location = new Point(12, 12)
         });
 
-        panel.Controls.Add(new Label
-        {
-            Text = "Modul fitur RF Private • menggunakan sesi proses Muiz Tool",
-            AutoSize = false,
-            Location = new Point(12, 43),
-            Size = new Size(720, 34),
-            ForeColor = ForeColorDim
-        });
-
-        var processGroup = new GroupBox
-        {
-            Text = "PROCESS SESSION",
-            Location = new Point(12, 86),
-            Size = new Size(720, 82),
-            ForeColor = ForeColorMain,
-            BackColor = BackColorMain
-        };
-
-        privateAdvanceProcessStatusLabel = new Label
-        {
-            AutoSize = false,
-            Location = new Point(14, 27),
-            Size = new Size(680, 22),
-            ForeColor = ForeColorDim,
-            Text = "Status: belum attach"
-        };
-        processGroup.Controls.Add(privateAdvanceProcessStatusLabel);
-        panel.Controls.Add(processGroup);
-
-        var moduleGroup = new GroupBox
-        {
-            Text = "PRIVATE ADVANCE MODULE",
-            Location = new Point(12, 190),
-            Size = new Size(720, 112),
-            ForeColor = ForeColorMain,
-            BackColor = BackColorMain
-        };
-
-        moduleGroup.Controls.Add(new Label
-        {
-            AutoSize = false,
-            Location = new Point(14, 27),
-            Size = new Size(680, 68),
-            ForeColor = ForeColorDim,
-            Text = "Fitur Private Advance tetap terkunci sampai Base Pointer dapat di-resolve dan alamatnya berhasil dibaca dari proses RF_Online yang sedang di-attach. Validasi ini hanya membaca memori; belum menjalankan fitur KENTUYUK."
-        });
-        panel.Controls.Add(moduleGroup);
-
-        panel.Controls.Add(new Label
-        {
-            AutoSize = false,
-            Location = new Point(12, 316),
-            Size = new Size(720, 56),
-            ForeColor = ForeColorDim,
-            Text = "Catatan: Tab ini tidak mencari atau melakukan attach proses sendiri. Proses mengikuti pilihan dan sesi Attach Muiz Tool."
-        });
-
-        LoadPrivateAdvanceBasePointer();
-        tab.Controls.Add(panel);
         UpdatePrivateAdvanceStatus();
     }
 
@@ -105,20 +39,28 @@ public sealed partial class MainForm
         try
         {
             BasePointerSettings settings = BasePointerStore.Load();
+
             if (privateAdvanceBasePointerTextBox != null)
-                privateAdvanceBasePointerTextBox.Text = $"{settings.ModuleName}+{settings.Offset}";
+            {
+                privateAdvanceBasePointerTextBox.Text =
+                    $"{settings.ModuleName}+{settings.Offset}";
+            }
 
             privateAdvanceBasePointerSaved = BasePointerStore.Exists;
+
             SetPrivateAdvancePointerStatus(
                 privateAdvanceBasePointerSaved
-                    ? "Status: konfigurasi Base Pointer dimuat dari penyimpanan lokal."
-                    : "Status: Base Pointer default terisi. Tekan SAVE untuk menyimpannya.",
+                    ? "Status: Base Pointer berhasil dimuat."
+                    : "Status: Base Pointer belum disimpan. Tekan SAVE.",
                 Color.Goldenrod);
         }
         catch (Exception ex)
         {
             privateAdvanceBasePointerSaved = false;
-            SetPrivateAdvancePointerStatus($"Status: gagal memuat konfigurasi ({ex.Message}).", Color.OrangeRed);
+
+            SetPrivateAdvancePointerStatus(
+                $"Status: gagal memuat konfigurasi ({ex.Message}).",
+                Color.OrangeRed);
         }
     }
 
@@ -127,11 +69,17 @@ public sealed partial class MainForm
         if (privateAdvanceBasePointerTextBox == null)
             return;
 
-        if (!TryParsePrivateAdvanceBasePointer(privateAdvanceBasePointerTextBox.Text, out long offset))
+        if (!TryParsePrivateAdvanceBasePointer(
+                privateAdvanceBasePointerTextBox.Text,
+                out long offset))
         {
             privateAdvanceBasePointerSaved = false;
             privateAdvanceBasePointerValidForSession = false;
-            SetPrivateAdvancePointerStatus("Format tidak valid. Gunakan RF_Online.bin+01F8CFBC.", Color.OrangeRed);
+
+            SetPrivateAdvancePointerStatus(
+                "Format tidak valid. Contoh: RF_Online.bin+01F8CFBC.",
+                Color.OrangeRed);
+
             return;
         }
 
@@ -140,42 +88,62 @@ public sealed partial class MainForm
             BasePointerStore.Save(new BasePointerSettings
             {
                 ModuleName = PrivateAdvanceModuleName,
-                Offset = offset.ToString("X8", CultureInfo.InvariantCulture)
+                Offset = offset.ToString(
+                    "X8",
+                    CultureInfo.InvariantCulture)
             });
 
-            privateAdvanceBasePointerTextBox.Text = $"{PrivateAdvanceModuleName}+{offset:X8}";
+            privateAdvanceBasePointerTextBox.Text =
+                $"{PrivateAdvanceModuleName}+{offset:X8}";
+
             privateAdvanceBasePointerSaved = true;
             privateAdvanceBasePointerValidForSession = false;
 
             if (selectedProcess != null && memory != null)
                 ValidatePrivateAdvanceBasePointer();
             else
-                SetPrivateAdvancePointerStatus("Status: Base Pointer berhasil disimpan. Attach RF_Online untuk validasi.", Color.Goldenrod);
+                SetPrivateAdvancePointerStatus(
+                    "Status: Base Pointer berhasil disimpan. Attach RF_Online untuk validasi.",
+                    Color.Goldenrod);
         }
         catch (Exception ex)
         {
             privateAdvanceBasePointerSaved = false;
-            SetPrivateAdvancePointerStatus($"Status: gagal menyimpan Base Pointer ({ex.Message}).", Color.OrangeRed);
+
+            SetPrivateAdvancePointerStatus(
+                $"Status: gagal menyimpan Base Pointer ({ex.Message}).",
+                Color.OrangeRed);
         }
     }
 
-    private static bool TryParsePrivateAdvanceBasePointer(string? value, out long offset)
+    private static bool TryParsePrivateAdvanceBasePointer(
+        string? value,
+        out long offset)
     {
         offset = 0;
+
         if (string.IsNullOrWhiteSpace(value))
             return false;
 
         string normalized = value.Trim().Replace(" ", string.Empty);
         string prefix = PrivateAdvanceModuleName + "+";
-        if (!normalized.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+
+        if (!normalized.StartsWith(
+                prefix,
+                StringComparison.OrdinalIgnoreCase))
             return false;
 
         string hex = normalized.Substring(prefix.Length);
+
         if (hex.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
             hex = hex.Substring(2);
 
         return hex.Length is > 0 and <= 8 &&
-               long.TryParse(hex, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out offset) &&
+               long.TryParse(
+                   hex,
+                   NumberStyles.HexNumber,
+                   CultureInfo.InvariantCulture,
+                   out offset) &&
                offset > 0;
     }
 
@@ -183,42 +151,65 @@ public sealed partial class MainForm
     {
         privateAdvanceBasePointerValidForSession = false;
 
-        if (!privateAdvanceBasePointerSaved || selectedProcess == null || memory == null)
+        if (!privateAdvanceBasePointerSaved ||
+            selectedProcess == null ||
+            memory == null)
         {
-            SetPrivateAdvancePointerStatus("Status: belum siap — simpan Base Pointer dan attach RF_Online.", Color.Goldenrod);
+            SetPrivateAdvancePointerStatus(
+                "Status: belum siap. Simpan Base Pointer dan Attach RF_Online.",
+                Color.Goldenrod);
+
             return;
         }
 
         try
         {
             if (selectedProcess.HasExited ||
-                !selectedProcess.ProcessName.Equals("RF_Online", StringComparison.OrdinalIgnoreCase))
+                !selectedProcess.ProcessName.Equals(
+                    "RF_Online",
+                    StringComparison.OrdinalIgnoreCase))
             {
-                SetPrivateAdvancePointerStatus("Status: proses aktif bukan RF_Online.", Color.OrangeRed);
+                SetPrivateAdvancePointerStatus(
+                    "Status: proses aktif bukan RF_Online.",
+                    Color.OrangeRed);
+
                 return;
             }
 
-            if (!TryParsePrivateAdvanceBasePointer(privateAdvanceBasePointerTextBox?.Text, out long offset))
+            if (!TryParsePrivateAdvanceBasePointer(
+                    privateAdvanceBasePointerTextBox?.Text,
+                    out long offset))
             {
-                SetPrivateAdvancePointerStatus("Status: format Base Pointer tidak valid.", Color.OrangeRed);
+                SetPrivateAdvancePointerStatus(
+                    "Status: format Base Pointer tidak valid.",
+                    Color.OrangeRed);
+
                 return;
             }
 
-            IntPtr resolvedAddress = new(memory.ModuleBase.ToInt64() + offset);
-            _ = memory.ReadByte(resolvedAddress); // Validasi read-only: pastikan alamat dapat dibaca.
+            IntPtr resolvedAddress = new(
+                memory.ModuleBase.ToInt64() + offset);
+
+            // Validasi read-only.
+            _ = memory.ReadByte(resolvedAddress);
 
             privateAdvanceBasePointerValidForSession = true;
+
             SetPrivateAdvancePointerStatus(
-                $"Status: pemeriksaan dasar lolos pada PID {selectedProcess.Id}; alamat dapat dibaca. Pointer chain belum diverifikasi.",
+                $"Status: valid pada PID {selectedProcess.Id}. Alamat dapat dibaca.",
                 Color.LightGreen);
         }
         catch (Exception ex)
         {
-            SetPrivateAdvancePointerStatus($"Status: validasi gagal ({ex.Message}).", Color.OrangeRed);
+            SetPrivateAdvancePointerStatus(
+                $"Status: validasi gagal ({ex.Message}).",
+                Color.OrangeRed);
         }
     }
 
-    private void SetPrivateAdvancePointerStatus(string message, Color color)
+    private void SetPrivateAdvancePointerStatus(
+        string message,
+        Color color)
     {
         if (privateAdvanceBasePointerStatusLabel == null)
             return;
@@ -229,16 +220,19 @@ public sealed partial class MainForm
 
     private void UpdatePrivateAdvanceStatus()
     {
-        if (privateAdvanceProcessStatusLabel == null)
-            return;
-
-        if (selectedProcess == null || memory == null || features == null)
+        if (selectedProcess == null ||
+            memory == null ||
+            features == null)
         {
-            privateAdvanceProcessStatusLabel.Text = "Status: belum attach";
-            privateAdvanceProcessStatusLabel.ForeColor = ForeColorDim;
             privateAdvanceBasePointerValidForSession = false;
+
             if (privateAdvanceBasePointerSaved)
-                SetPrivateAdvancePointerStatus("Status: konfigurasi tersimpan. Attach RF_Online untuk validasi.", Color.Goldenrod);
+            {
+                SetPrivateAdvancePointerStatus(
+                    "Status: konfigurasi tersimpan. Attach RF_Online untuk validasi.",
+                    Color.Goldenrod);
+            }
+
             return;
         }
 
@@ -246,23 +240,24 @@ public sealed partial class MainForm
         {
             if (selectedProcess.HasExited)
             {
-                privateAdvanceProcessStatusLabel.Text = "Status: proses sudah berhenti";
-                privateAdvanceProcessStatusLabel.ForeColor = Color.OrangeRed;
                 privateAdvanceBasePointerValidForSession = false;
-                SetPrivateAdvancePointerStatus("Status: proses berhenti; validasi sesi dibatalkan.", Color.OrangeRed);
+
+                SetPrivateAdvancePointerStatus(
+                    "Status: proses berhenti. Validasi sesi dibatalkan.",
+                    Color.OrangeRed);
+
                 return;
             }
 
-            privateAdvanceProcessStatusLabel.Text =
-                $"Status: terhubung ke {selectedProcess.ProcessName} (PID {selectedProcess.Id})";
-            privateAdvanceProcessStatusLabel.ForeColor = Color.LightGreen;
             ValidatePrivateAdvanceBasePointer();
         }
         catch (Exception ex)
         {
-            privateAdvanceProcessStatusLabel.Text = $"Status: sesi tidak tersedia ({ex.Message})";
-            privateAdvanceProcessStatusLabel.ForeColor = Color.OrangeRed;
             privateAdvanceBasePointerValidForSession = false;
+
+            SetPrivateAdvancePointerStatus(
+                $"Status: sesi tidak tersedia ({ex.Message}).",
+                Color.OrangeRed);
         }
     }
 }
