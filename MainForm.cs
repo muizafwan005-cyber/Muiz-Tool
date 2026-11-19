@@ -484,6 +484,18 @@ public sealed partial class MainForm : Form
         tabs.TabPages.Add(tab6);
         
         BuildTab6(tab6);
+
+        // =====================================================
+        // TAB 7 - PRIVATE ADVANCE
+        // =====================================================
+        var tab7 = new TabPage
+        {
+            Text = "PRIVATE ADVANCE",
+            BackColor = BackColorMain,
+            ForeColor = ForeColorMain
+        };
+        tabs.TabPages.Add(tab7);
+        BuildTab7(tab7);
         
                 Controls.Add(
                     tabs);
@@ -655,6 +667,8 @@ public sealed partial class MainForm : Form
 
             attachButton.Text =
                 "ATTACHED";
+
+            UpdatePrivateAdvanceStatus();
                 
             UpdateRFClickerButtons();
         }
@@ -767,6 +781,8 @@ public sealed partial class MainForm : Form
 
         statusLabel.Text =
             "Status: Not attached";
+
+        UpdatePrivateAdvanceStatus();
     }
 
     private void MainForm_FormClosing(
