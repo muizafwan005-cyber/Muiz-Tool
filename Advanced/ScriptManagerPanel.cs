@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using RFTool.AdvancedSystem;
 
 namespace RFTool.Advanced;
 
@@ -51,9 +52,7 @@ internal sealed class ScriptManagerPanel : UserControl
     private readonly Button enableBtn;
     private readonly Button disableBtn;
     private readonly Button stopBtn;
-
-    private readonly Dictionary<string, AaSession> aaSessions =
-        new Dictionary<string, AaSession>(StringComparer.OrdinalIgnoreCase);
+    private readonly Button addToAddressBtn;
 
     private readonly AaSession luaSession = new AaSession();
 
@@ -150,6 +149,7 @@ internal sealed class ScriptManagerPanel : UserControl
         stopBtn = AdvTheme.Btn("Stop", 56);
         Button clearBtn = AdvTheme.Btn("Clear", 56);
         Button resetLuaBtn = AdvTheme.Btn("Reset Lua", 82);
+        addToAddressBtn = AdvTheme.Btn("Add to Address Manager", 160);
 
         runBar.Controls.Add(saveBtn);
         runBar.Controls.Add(runBtn);
@@ -158,6 +158,7 @@ internal sealed class ScriptManagerPanel : UserControl
         runBar.Controls.Add(stopBtn);
         runBar.Controls.Add(clearBtn);
         runBar.Controls.Add(resetLuaBtn);
+        runBar.Controls.Add(addToAddressBtn);
 
         fileLabel = new Label
         {
@@ -186,6 +187,7 @@ internal sealed class ScriptManagerPanel : UserControl
         disableBtn.Click += (s, e) => RunAa(false);
         stopBtn.Click += (s, e) => cts?.Cancel();
         clearBtn.Click += (s, e) => console.Clear();
+        addToAddressBtn.Click += (s, e) => AddToAddressManager();
 
         resetLuaBtn.Click += (s, e) =>
         {
@@ -204,6 +206,8 @@ internal sealed class ScriptManagerPanel : UserControl
             UpdateLabel();
         };
 
+        services.AaLog += Log;
+
         EnsureSamples();
         ReloadList(null);
         UpdateButtons();
@@ -214,7 +218,10 @@ internal sealed class ScriptManagerPanel : UserControl
     protected override void Dispose(bool disposing)
     {
         if (disposing)
+        {
+            services.AaLog -= Log;
             cts?.Cancel();
+        }
 
         base.Dispose(disposing);
     }
@@ -361,6 +368,7 @@ internal sealed class ScriptManagerPanel : UserControl
         enableBtn.Enabled = has && !lua && !running;
         disableBtn.Enabled = has && !lua && !running;
         stopBtn.Enabled = running;
+        addToAddressBtn.Enabled = has && !lua;
     }
 
     private void SaveIfDirty()
@@ -474,7 +482,7 @@ internal sealed class ScriptManagerPanel : UserControl
         try
         {
             File.Delete(currentPath);
-            aaSessions.Remove(currentPath);
+            services.RemoveAaSession(currentPath);
 
             loading = true;
             editor.Clear();
@@ -532,6 +540,38 @@ internal sealed class ScriptManagerPanel : UserControl
         }
     }
 
+    private void AddToAddressManager()
+    {
+        if (currentPath == null || IsLua(currentPath))
+            return;
+
+        SaveIfDirty();
+
+        foreach (AddressEntry existing in services.Manager.Entries)
+        {
+            if (string.Equals(existing.ScriptPath, currentPath, StringComparison.OrdinalIgnoreCase))
+            {
+                Log("Skrip ini sudah ada di Address Manager.");
+                return;
+            }
+        }
+
+        services.Manager.Add(new AddressEntry
+        {
+            Description = Path.GetFileNameWithoutExtension(currentPath),
+            Address = "(script)",
+            ValueType = AddressEntry.ScriptTypeName,
+            Value = "",
+            Group = "Scripts",
+            ScriptPath = currentPath,
+            ScriptText = editor.Text,
+            Freeze = services.IsAaActive(currentPath)
+        });
+
+        Log("Ditambahkan ke Address Manager: " + Path.GetFileName(currentPath) +
+            ". Centang Freeze di sana untuk Enable, hilangkan centang untuk Disable.");
+    }
+
     private async void RunAa(bool enable)
     {
         if (currentPath == null || running)
@@ -542,11 +582,7 @@ internal sealed class ScriptManagerPanel : UserControl
         string text = editor.Text;
         string path = currentPath;
 
-        if (!aaSessions.TryGetValue(path, out AaSession? session))
-        {
-            session = new AaSession();
-            aaSessions[path] = session;
-        }
+        AaSession session = services.GetAaSession(path);
 
         running = true;
         UpdateButtons();
@@ -561,6 +597,10 @@ internal sealed class ScriptManagerPanel : UserControl
                 new AutoAssembler(services.Target, Log, token, services.Lua).Run(text, enable, session));
 
             Log(ok ? "[AA] Berhasil." : "[AA] Gagal (lihat pesan di atas).");
+
+            // Beri tahu Address Manager agar centang Freeze script ikut berubah
+            if (ok)
+                services.SetAaActive(path, enable);
         }
         finally
         {
