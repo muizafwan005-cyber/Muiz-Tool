@@ -41,9 +41,64 @@ internal sealed class AdvancedServices : IDisposable
             });
     }
 
+    // ---------- Sesi Auto Assemble bersama (Script Manager + Address Manager) ----------
+
+    private readonly Dictionary<string, AaSession> aaSessions =
+        new Dictionary<string, AaSession>(StringComparer.OrdinalIgnoreCase);
+
+    private readonly HashSet<string> aaActive =
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>(kunci script, aktif?) - dipanggil di UI thread setiap script di-enable/disable.</summary>
+    public event Action<string, bool>? AaStateChanged;
+
+    /// <summary>Pesan log Auto Assemble dari Address Manager (bisa dari thread lain).</summary>
+    public event Action<string>? AaLog;
+
+    public AaSession GetAaSession(string key)
+    {
+        if (!aaSessions.TryGetValue(key, out AaSession? session))
+        {
+            session = new AaSession();
+            aaSessions[key] = session;
+        }
+
+        return session;
+    }
+
+    public void RemoveAaSession(string key)
+    {
+        aaSessions.Remove(key);
+        aaActive.Remove(key);
+    }
+
+    public bool IsAaActive(string key)
+    {
+        return aaActive.Contains(key);
+    }
+
+    public void SetAaActive(string key, bool active)
+    {
+        if (active)
+            aaActive.Add(key);
+        else
+            aaActive.Remove(key);
+
+        AaStateChanged?.Invoke(key, active);
+    }
+
+    public void RaiseAaLog(string line)
+    {
+        AaLog?.Invoke(line);
+    }
+
     /// <summary>Dipanggil dari DetachCurrent(): semua Freeze dimatikan, handle ditutup.</summary>
     public void OnDetach()
     {
+        // Memori hasil alloc ikut hilang bersama process, jadi status script dibersihkan.
+        aaSessions.Clear();
+        aaActive.Clear();
+
         foreach (AddressEntry e in Manager.Entries)
             e.Freeze = false;
 
@@ -177,6 +232,10 @@ internal sealed class FreezeService : IDisposable
 
         foreach (AddressEntry e in manager.Entries)
         {
+            // Entri script diatur oleh Auto Assemble, bukan oleh mesin Freeze nilai.
+            if (e.IsScript)
+                continue;
+
             if (!e.Freeze)
             {
                 e.Status = "";
