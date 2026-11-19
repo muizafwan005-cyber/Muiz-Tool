@@ -67,58 +67,10 @@ public sealed partial class MainForm
         processGroup.Controls.Add(privateAdvanceProcessStatusLabel);
         panel.Controls.Add(processGroup);
 
-        var pointerGroup = new GroupBox
-        {
-            Text = "PRIVATE ADVANCE BASE POINTER",
-            Location = new Point(12, 180),
-            Size = new Size(720, 150),
-            ForeColor = ForeColorMain,
-            BackColor = BackColorMain
-        };
-
-        pointerGroup.Controls.Add(new Label
-        {
-            AutoSize = true,
-            Location = new Point(14, 27),
-            ForeColor = ForeColorDim,
-            Text = "Base Pointer (module + offset)"
-        });
-
-        privateAdvanceBasePointerTextBox = new TextBox
-        {
-            Location = new Point(14, 52),
-            Size = new Size(500, 27),
-            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
-            Text = $"{PrivateAdvanceModuleName}+{PrivateAdvanceBaseOffset:X8}"
-        };
-        pointerGroup.Controls.Add(privateAdvanceBasePointerTextBox);
-
-        privateAdvanceSaveBasePointerButton = new Button
-        {
-            Text = "SAVE",
-            Location = new Point(526, 50),
-            Size = new Size(165, 30),
-            Anchor = AnchorStyles.Top | AnchorStyles.Right,
-            UseVisualStyleBackColor = true
-        };
-        privateAdvanceSaveBasePointerButton.Click += (_, _) => SavePrivateAdvanceBasePointer();
-        pointerGroup.Controls.Add(privateAdvanceSaveBasePointerButton);
-
-        privateAdvanceBasePointerStatusLabel = new Label
-        {
-            AutoSize = false,
-            Location = new Point(14, 91),
-            Size = new Size(680, 42),
-            ForeColor = Color.Goldenrod,
-            Text = "Status: konfigurasi default belum disimpan. Attach game untuk validasi."
-        };
-        pointerGroup.Controls.Add(privateAdvanceBasePointerStatusLabel);
-        panel.Controls.Add(pointerGroup);
-
         var moduleGroup = new GroupBox
         {
             Text = "PRIVATE ADVANCE MODULE",
-            Location = new Point(12, 342),
+            Location = new Point(12, 190),
             Size = new Size(720, 112),
             ForeColor = ForeColorMain,
             BackColor = BackColorMain
@@ -137,7 +89,7 @@ public sealed partial class MainForm
         panel.Controls.Add(new Label
         {
             AutoSize = false,
-            Location = new Point(12, 466),
+            Location = new Point(12, 316),
             Size = new Size(720, 56),
             ForeColor = ForeColorDim,
             Text = "Catatan: Tab ini tidak mencari atau melakukan attach proses sendiri. Proses mengikuti pilihan dan sesi Attach Muiz Tool."
