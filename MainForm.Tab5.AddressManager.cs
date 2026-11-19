@@ -175,6 +175,8 @@ public sealed partial class MainForm
         };
         
         addressGrid.CellValueChanged += AddressGrid_CellValueChanged;
+        addressGrid.CellFormatting += AddressGrid_CellFormatting;
+        addressGrid.CellToolTipTextNeeded += AddressGrid_CellToolTipTextNeeded;
 
         addressGrid.DataError += (_, e) => e.ThrowException = false;
 
