@@ -53,9 +53,13 @@ public sealed partial class MainForm
 
         for (int i = first; i <= last; i++)
         {
-            string text = target == null
-                ? "??"
-                : ReadLiveValue(target, addressManager.Entries[i]);
+            AddressEntry entry = addressManager.Entries[i];
+
+            string text = entry.IsScript
+                ? (AdvSvc.IsAaActive(entry.ScriptKey) ? "ENABLED" : "disabled")
+                : target == null
+                    ? "??"
+                    : ReadLiveValue(target, entry);
 
             DataGridViewCell cell = addressGrid.Rows[i].Cells["Live"];
 
