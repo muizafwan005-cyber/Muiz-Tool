@@ -197,6 +197,7 @@ public sealed partial class MainForm
 
         EnsureAddressInfoTimer();
         EnsureAddressLiveTimer();
+        AdvSvc.AaStateChanged += OnAaStateChanged;
     }
     // =========================================================
     // TOOLBAR BUTTON
@@ -258,6 +259,12 @@ public sealed partial class MainForm
             return;
         }
 
+        if (addressManager.Entries[index].IsScript)
+        {
+            EditScriptEntry(addressManager.Entries[index]);
+            return;
+        }
+
         var entry = ShowAddressEditor(
             addressManager.Entries[index]);
 
@@ -281,6 +288,14 @@ public sealed partial class MainForm
             index >= addressManager.Entries.Count)
         {
             MessageBox.Show("Pilih alamat terlebih dahulu.");
+            return;
+        }
+
+        if (ScriptStillActive(addressManager.Entries[index]))
+        {
+            MessageBox.Show(
+                "Script masih aktif. Hilangkan centang Freeze (Disable) dulu sebelum menghapus.",
+                "Address Manager");
             return;
         }
 
@@ -424,6 +439,9 @@ public sealed partial class MainForm
             return;
         }
 
+        if (RejectScriptEntry(entry))
+            return;
+
         bool ok = EntryIO.TryWrite(
             AdvSvc.Target,
             entry,
@@ -442,6 +460,9 @@ public sealed partial class MainForm
             MessageBox.Show("Pilih alamat terlebih dahulu.");
             return;
         }
+
+        if (RejectScriptEntry(entry))
+            return;
 
         if (EntryIO.TryRead(
                 AdvSvc.Target,
@@ -477,6 +498,12 @@ public sealed partial class MainForm
             return;
 
         AddressEntry entry = addressManager.Entries[e.RowIndex];
+
+        if (entry.IsScript)
+        {
+            HandleScriptToggle(entry);
+            return;
+        }
 
         if (entry.Freeze &&
             !ValidateForFreeze(entry, out string problem))
@@ -573,6 +600,16 @@ public sealed partial class MainForm
         if (entry == null)
             return;
 
+        if (entry.IsScript)
+        {
+            addressInfoLabel.Text =
+                "Script: " + entry.Description + " - " +
+                (AdvSvc.IsAaActive(entry.ScriptKey) ? "AKTIF" : "nonaktif") +
+                ". Centang Freeze untuk Enable, hilangkan centang untuk Disable." +
+                (entry.Status.Length > 0 ? "   |   " + entry.Status : "");
+            return;
+        }
+
         string status =
             entry.Status.Length > 0
                 ? "   |   " + entry.Status
@@ -606,6 +643,9 @@ public sealed partial class MainForm
             MessageBox.Show("Pilih alamat terlebih dahulu.");
             return;
         }
+
+        if (RejectScriptEntry(entry))
+            return;
 
         BrowseInMemoryViewer(entry.Address);
     }
@@ -662,6 +702,9 @@ public sealed partial class MainForm
             return;
         }
 
+        if (RejectScriptEntry(entry))
+            return;
+
         DisassembleInCodeAnalyzer(entry.Address);
     }
 
@@ -674,6 +717,9 @@ public sealed partial class MainForm
             MessageBox.Show("Pilih alamat terlebih dahulu.");
             return;
         }
+
+        if (RejectScriptEntry(entry))
+            return;
 
         PointerScanFor(entry.Address);
     }
