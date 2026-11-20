@@ -74,6 +74,15 @@ public class AddressEntry : INotifyPropertyChanged
         set { if (signed != value) { signed = value; Raise(); } }
     }
 
+    /// <summary>ID unik entri (dipakai sebagai referensi group).</summary>
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+
+    /// <summary>Id address utama (parent). Kosong = entri berdiri sendiri.</summary>
+    public string ParentId { get; set; } = "";
+
+    /// <summary>true = anggota group hanya tampil saat entri ini aktif (Freeze dicentang / script enabled).</summary>
+    public bool HideChildren { get; set; } = true;
+
     public const string ScriptTypeName = "Auto Assembler Script";
 
     /// <summary>Jika diisi, entri ini adalah script Auto Assemble (file di folder scripts).</summary>
