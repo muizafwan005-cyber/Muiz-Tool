@@ -29,7 +29,7 @@ public sealed partial class MainForm
         };
 
         layout.RowStyles.Add(
-            new RowStyle(SizeType.Absolute, 42));
+            new RowStyle(SizeType.Absolute, 76));
 
         layout.RowStyles.Add(
             new RowStyle(SizeType.Percent, 100));
@@ -64,6 +64,9 @@ public sealed partial class MainForm
         AddAddressButton(toolbar, "LOAD", LoadAddresses);
 
             AddAddressButton(toolbar, "LOAD CT", LoadCheatTable, 80);
+        AddAddressButton(toolbar, "GROUP", GroupSelected);
+        AddAddressButton(toolbar, "UNGROUP", UngroupSelected, 76);
+        AddAddressButton(toolbar, "HIDE", ToggleHideChildren);
 
         // =====================================================
         // ADDRESS GRID
@@ -78,7 +81,7 @@ public sealed partial class MainForm
             AllowUserToAddRows = false,
             AllowUserToDeleteRows = false,
             AllowUserToResizeRows = false,
-            MultiSelect = false,
+            MultiSelect = true,
             ReadOnly = false,
             SelectionMode = DataGridViewSelectionMode.FullRowSelect,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
@@ -176,6 +179,7 @@ public sealed partial class MainForm
         
         addressGrid.CellValueChanged += AddressGrid_CellValueChanged;
         addressGrid.CellFormatting += AddressGrid_CellFormatting;
+        addressGrid.CellFormatting += AddressGrid_DescriptionFormatting;
         addressGrid.CellToolTipTextNeeded += AddressGrid_CellToolTipTextNeeded;
 
         addressGrid.DataError += (_, e) => e.ThrowException = false;
@@ -310,6 +314,7 @@ public sealed partial class MainForm
         if (result != DialogResult.Yes)
             return;
 
+        DetachChildren(addressManager.Entries[index]);
         addressManager.Remove(index);
 
         AdvSvc.Freeze.Refresh();
@@ -410,6 +415,13 @@ public sealed partial class MainForm
         }
 
         draft.Freeze = existing?.Freeze ?? false;
+
+        if (existing != null)
+        {
+            draft.Id = existing.Id;
+            draft.ParentId = existing.ParentId;
+            draft.HideChildren = existing.HideChildren;
+        }
         return draft;
     }
 
@@ -521,7 +533,11 @@ public sealed partial class MainForm
             return;
         }
 
+        if (!entry.Freeze)
+            CascadeDeactivate(entry);
+
         AdvSvc.Freeze.Refresh();
+        ApplyGroupVisibility();
     }
 
     private bool ValidateForFreeze(
@@ -679,11 +695,33 @@ public sealed partial class MainForm
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(AdvTheme.Item("Remove selected address", RemoveAddress, Keys.Control | Keys.Delete));
 
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add(AdvTheme.Item("Group selected (baris teratas = address utama)", GroupSelected));
+        menu.Items.Add(AdvTheme.Item("Ungroup", UngroupSelected));
+
+        ToolStripMenuItem hideItem = AdvTheme.Item(
+            "Hide group sampai address utama aktif",
+            ToggleHideChildren);
+
+        menu.Items.Add(hideItem);
+
+        menu.Opening += (_, _) =>
+        {
+            RebuildGroupCache();
+
+            hideItem.Checked = SelectedEntries()
+                .Any(x => groupCache.Parents.Contains(x) && x.HideChildren);
+        };
+
         addressGrid.ContextMenuStrip = menu;
 
         addressGrid.CellMouseDown += (_, e) =>
         {
             if (e.Button != MouseButtons.Right || e.RowIndex < 0)
+                return;
+
+            // Klik kanan di dalam blok terpilih: pertahankan multi-select
+            if (addressGrid.Rows[e.RowIndex].Selected)
                 return;
 
             addressGrid.ClearSelection();
