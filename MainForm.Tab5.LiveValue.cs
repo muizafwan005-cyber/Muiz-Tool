@@ -41,6 +41,8 @@ public sealed partial class MainForm
             return;
         }
 
+        ApplyGroupVisibility();
+
         int count = Math.Min(addressGrid.Rows.Count, addressManager.Entries.Count);
 
         if (count == 0)
@@ -48,12 +50,17 @@ public sealed partial class MainForm
 
         // Hanya baris yang terlihat di layar yang dibaca
         int first = Math.Max(0, addressGrid.FirstDisplayedScrollingRowIndex);
-        int last = Math.Min(count - 1, first + addressGrid.DisplayedRowCount(true));
+        int budget = addressGrid.DisplayedRowCount(true) + 1;
 
         TargetProcess? target = AdvSvc.Target.Get();
 
-        for (int i = first; i <= last; i++)
+        for (int i = first; i < count && budget > 0; i++)
         {
+            if (!addressGrid.Rows[i].Visible)
+                continue;
+
+            budget--;
+
             AddressEntry entry = addressManager.Entries[i];
             string text;
 
