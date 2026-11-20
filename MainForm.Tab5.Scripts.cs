@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -141,15 +142,23 @@ public sealed partial class MainForm
     // Script di-enable/disable dari Script Manager -> centang di Address Manager ikut berubah
     private void OnAaStateChanged(string key, bool active)
     {
-        foreach (AddressEntry e in addressManager.Entries)
+        foreach (AddressEntry e in addressManager.Entries.ToList())
         {
-            if (e.IsScript &&
-                e.Freeze != active &&
-                string.Equals(e.ScriptKey, key, StringComparison.OrdinalIgnoreCase))
+            if (!e.IsScript ||
+                !string.Equals(e.ScriptKey, key, StringComparison.OrdinalIgnoreCase))
             {
-                e.Freeze = active;
+                continue;
             }
+
+            if (e.Freeze != active)
+                e.Freeze = active;
+
+            // Address utama dimatikan -> semua anggota group ikut dimatikan
+            if (!active)
+                CascadeDeactivate(e);
         }
+
+        ApplyGroupVisibility();
     }
 
     private bool ScriptStillActive(AddressEntry entry)
