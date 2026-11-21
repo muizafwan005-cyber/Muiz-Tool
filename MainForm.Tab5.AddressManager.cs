@@ -67,6 +67,7 @@ public sealed partial class MainForm
         AddAddressButton(toolbar, "GROUP", GroupSelected);
         AddAddressButton(toolbar, "UNGROUP", UngroupSelected, 76);
         AddAddressButton(toolbar, "HIDE", ToggleHideChildren);
+        AddAddressButton(toolbar, "HOTKEY", ShowAddressHotkeyDialog, 70);
 
         // =====================================================
         // ADDRESS GRID
@@ -156,6 +157,14 @@ public sealed partial class MainForm
             ReadOnly = true,
             FillWeight = 85
         });
+
+        addressGrid.Columns.Add(new DataGridViewTextBoxColumn
+        {
+            Name = "Hotkey",
+            HeaderText = "Hotkey",
+            ReadOnly = true,
+            FillWeight = 70
+        });
         
         // FREEZE CHECKBOX
         addressGrid.Columns.Add(new DataGridViewCheckBoxColumn
@@ -178,6 +187,7 @@ public sealed partial class MainForm
         };
         
         addressGrid.CellValueChanged += AddressGrid_CellValueChanged;
+        addressGrid.CellDoubleClick += AddressGrid_CellDoubleClick;
         addressGrid.CellFormatting += AddressGrid_CellFormatting;
         addressGrid.CellFormatting += AddressGrid_DescriptionFormatting;
         addressGrid.CellToolTipTextNeeded += AddressGrid_CellToolTipTextNeeded;
@@ -204,6 +214,7 @@ public sealed partial class MainForm
         EnsureAddressInfoTimer();
         EnsureAddressLiveTimer();
         AdvSvc.AaStateChanged += OnAaStateChanged;
+        EnsureAddressHotkeyHook();
     }
     // =========================================================
     // TOOLBAR BUTTON
@@ -271,6 +282,8 @@ public sealed partial class MainForm
             return;
         }
 
+        string oldValue = addressManager.Entries[index].Value;
+
         var entry = ShowAddressEditor(
             addressManager.Entries[index]);
 
@@ -278,6 +291,17 @@ public sealed partial class MainForm
             return;
 
         addressManager.Edit(index, entry);
+
+        // Seperti Cheat Engine: value yang diubah langsung ditulis ke memori.
+        // (Freeze hanya perlu dicentang kalau nilai harus ditahan terus.)
+        if (!string.Equals(oldValue, entry.Value, StringComparison.Ordinal))
+        {
+            bool written = EntryIO.TryWrite(AdvSvc.Target, entry, out string writeMessage);
+
+            addressInfoLabel.Text = written
+                ? "Value diubah dan ditulis: " + writeMessage
+                : "Value tersimpan, tapi belum tertulis ke memori: " + writeMessage;
+        }
 
         AdvSvc.Freeze.Refresh();
     }
@@ -421,6 +445,8 @@ public sealed partial class MainForm
             draft.Id = existing.Id;
             draft.ParentId = existing.ParentId;
             draft.HideChildren = existing.HideChildren;
+            draft.Hotkeys = existing.Hotkeys;
+            draft.FreezeMode = existing.FreezeMode;
         }
         return draft;
     }
@@ -534,7 +560,10 @@ public sealed partial class MainForm
         }
 
         if (!entry.Freeze)
+        {
+            entry.FreezeMode = FreezeMode.Normal;
             CascadeDeactivate(entry);
+        }
 
         AdvSvc.Freeze.Refresh();
         ApplyGroupVisibility();
@@ -704,6 +733,8 @@ public sealed partial class MainForm
             ToggleHideChildren);
 
         menu.Items.Add(hideItem);
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add(AdvTheme.Item("Set/Change hotkey...", ShowAddressHotkeyDialog, Keys.Control | Keys.Space));
 
         menu.Opening += (_, _) =>
         {
