@@ -83,6 +83,12 @@ public class AddressEntry : INotifyPropertyChanged
     /// <summary>true = anggota group hanya tampil saat entri ini aktif (Freeze dicentang / script enabled).</summary>
     public bool HideChildren { get; set; } = true;
 
+    /// <summary>Normal / boleh naik / boleh turun saat Freeze.</summary>
+    public FreezeMode FreezeMode { get; set; } = FreezeMode.Normal;
+
+    /// <summary>Hotkey per address (Set/Change hotkey).</summary>
+    public List<AddressHotkey> Hotkeys { get; set; } = new();
+
     public const string ScriptTypeName = "Auto Assembler Script";
 
     /// <summary>Jika diisi, entri ini adalah script Auto Assemble (file di folder scripts).</summary>
