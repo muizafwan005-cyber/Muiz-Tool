@@ -209,6 +209,8 @@ internal sealed class FreezeService : IDisposable
         public AddressEntry Entry = null!;
         public string Expression = "";
         public byte[] Data = Array.Empty<byte>();
+        public FreezeMode Mode;
+        public ScanValueType Type;
     }
 
     private readonly TargetProvider provider;
@@ -250,7 +252,7 @@ internal sealed class FreezeService : IDisposable
                 continue;
             }
 
-            list.Add(new Item { Entry = e, Expression = e.Address, Data = data });
+            list.Add(new Item { Entry = e, Expression = e.Address, Data = data, Mode = e.FreezeMode, Type = type });
         }
 
         items = list.ToArray();
@@ -298,6 +300,29 @@ internal sealed class FreezeService : IDisposable
                 {
                     SetStatus(it.Entry, "Alamat gagal: " + err);
                     continue;
+                }
+
+                // "Allow increase/decrease": nilai hanya dikembalikan jika bergerak ke arah yang tidak diizinkan
+                if (it.Mode != FreezeMode.Normal &&
+                    it.Type != ScanValueType.String &&
+                    it.Type != ScanValueType.ByteArray)
+                {
+                    byte[]? current = t.ReadBytes(address, it.Data.Length);
+
+                    if (current != null)
+                    {
+                        int cmp = ValueCodec.Compare(current, it.Data, it.Type);
+
+                        if ((it.Mode == FreezeMode.AllowIncrease && cmp >= 0) ||
+                            (it.Mode == FreezeMode.AllowDecrease && cmp <= 0))
+                        {
+                            SetStatus(it.Entry,
+                                "Freeze aktif (" +
+                                (it.Mode == FreezeMode.AllowIncrease ? "boleh naik" : "boleh turun") +
+                                ") -> 0x" + t.FormatAddress(address));
+                            continue;
+                        }
+                    }
                 }
 
                 if (t.Write(address, it.Data))
