@@ -82,6 +82,12 @@ public sealed partial class MainForm
                 text = resolved ? ReadLiveValue(target, entry, address) : "??";
             }
 
+            DataGridViewCell hotkeyCell = addressGrid.Rows[i].Cells["Hotkey"];
+            string hotkeyText = HotkeySummary(entry);
+
+            if (!Equals(hotkeyCell.Value, hotkeyText))
+                hotkeyCell.Value = hotkeyText;
+
             DataGridViewCell cell = addressGrid.Rows[i].Cells["Live"];
 
             if (!Equals(cell.Value, text))
