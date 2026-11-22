@@ -258,6 +258,10 @@ internal sealed class PurseChargerResolver
                 if (value < minValue || value > maxValue)
                     continue;
 
+                // Pointer ke objek selalu sejajar 4 byte; nilai tidak sejajar = kebetulan.
+                if ((value & 3) != 0)
+                    continue;
+
                 if (value >= start && value < moduleEnd)
                     continue;
 
@@ -506,7 +510,7 @@ internal sealed class PurseChargerResolver
     {
         var sb = new StringBuilder();
 
-        foreach (long hit in alignedHits.Take(8))
+        foreach (long hit in alignedHits.Take(12))
         {
             byte[]? now = ReadSnapshot(hit);
 
@@ -599,7 +603,12 @@ internal sealed class PurseChargerResolver
             report.AppendLine();
         }
 
-        string changeReport = BuildChangeReport(aligned);
+        // Hasil yang punya base pointer statis dibandingkan lebih dulu
+        long[] prioritized = aligned
+            .OrderByDescending(h => pointers.TryGetValue(h + 0x08, out List<StaticPointer>? p) && p.Count > 0)
+            .ToArray();
+
+        string changeReport = BuildChangeReport(prioritized);
 
         report.AppendLine("PERUBAHAN SEJAK SCAN SEBELUMNYA (snapshot 0x200 byte per hasil sejajar)");
         report.AppendLine(changeReport);
@@ -632,10 +641,10 @@ internal sealed class PurseChargerResolver
 
         string[] changeLines = changeReport.Split('\n');
 
-        foreach (string line in changeLines.Take(16))
+        foreach (string line in changeLines.Take(30))
             summary.AppendLine(line.TrimEnd('\r'));
 
-        if (changeLines.Length > 16)
+        if (changeLines.Length > 30)
             summary.AppendLine("... (lengkap di file laporan)");
 
         summary.AppendLine();
