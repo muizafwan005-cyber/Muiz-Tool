@@ -1140,7 +1140,10 @@ public sealed partial class MainForm
             UpdateTab4Layout();
 
             statusLabel.Text =
-                $"Status: Purse Charger AOB OK → 0x{address.ToInt64():X8}";
+                $"Status: Purse Charger OK → 0x{address.ToInt64():X8}" +
+                (features.PurseChargerInfo.Length > 0
+                    ? " | " + features.PurseChargerInfo
+                    : "");
         }
         catch (Exception ex)
         {
