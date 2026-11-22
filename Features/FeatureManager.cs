@@ -1883,12 +1883,23 @@ public void SetPlayerPointerOffset(long baseOffset)
 
         if (valid.Count == 0 || valid.Count > 16)
         {
-            throw new InvalidOperationException(
+            string message =
                 purseResolver.BuildDiagnostics(
                     hits.Count,
                     valid,
                     rawSamples,
-                    null));
+                    null);
+
+            // Tidak ada yang lolos marker: simpan dump semua hasil scan ke file.
+            if (valid.Count == 0)
+            {
+                message +=
+                    Environment.NewLine +
+                    Environment.NewLine +
+                    purseResolver.WriteReport(hits);
+            }
+
+            throw new InvalidOperationException(message);
         }
 
         // Cari base pointer statis untuk semua kandidat sekaligus.
