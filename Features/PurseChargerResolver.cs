@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using RFTool.Core;
@@ -405,6 +406,243 @@ internal sealed class PurseChargerResolver
         }
 
         return string.Join(" | ", parts);
+    }
+
+    // =========================================================
+    // LAPORAN LENGKAP (saat tidak ada kandidat yang lolos marker)
+    // Menyimpan dump tiap hasil scan ke file, supaya struktur
+    // yang sebenarnya bisa dikenali tanpa menebak.
+    // =========================================================
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MEMORY_BASIC_INFORMATION
+    {
+        public IntPtr BaseAddress;
+        public IntPtr AllocationBase;
+        public uint AllocationProtect;
+        public UIntPtr RegionSize;
+        public uint State;
+        public uint Protect;
+        public uint Type;
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern UIntPtr VirtualQueryEx(
+        IntPtr hProcess,
+        IntPtr lpAddress,
+        out MEMORY_BASIC_INFORMATION lpBuffer,
+        UIntPtr dwLength);
+
+    private string DescribeRegion(long address)
+    {
+        try
+        {
+            UIntPtr size = (UIntPtr)Marshal.SizeOf<MEMORY_BASIC_INFORMATION>();
+
+            if (VirtualQueryEx(memory.Handle, new IntPtr(address), out MEMORY_BASIC_INFORMATION mbi, size) == UIntPtr.Zero)
+                return "?";
+
+            string type = mbi.Type switch
+            {
+                0x20000 => "private",
+                0x1000000 => "image",
+                0x40000 => "mapped",
+                _ => "type 0x" + mbi.Type.ToString("X")
+            };
+
+            return $"{type}, protect 0x{mbi.Protect:X}, region 0x{mbi.BaseAddress.ToInt64():X}+0x{mbi.RegionSize.ToUInt64():X}";
+        }
+        catch
+        {
+            return "?";
+        }
+    }
+
+    private string DumpBytes(long address, int count)
+    {
+        try
+        {
+            byte[] data = memory.ReadBytes(new IntPtr(address), count);
+            var sb = new StringBuilder();
+
+            for (int i = 0; i < data.Length; i += 16)
+            {
+                int n = Math.Min(16, data.Length - i);
+
+                sb.AppendLine(
+                    $"    +{i:X2}: " +
+                    BitConverter.ToString(data, i, n).Replace('-', ' '));
+            }
+
+            return sb.ToString().TrimEnd();
+        }
+        catch
+        {
+            return "    (tidak bisa dibaca)";
+        }
+    }
+
+    // Snapshot hasil scan sebelumnya (dipertahankan selama aplikasi hidup)
+    // untuk membandingkan kondisi game "sebelum" dan "sesudah".
+    private static readonly Dictionary<long, byte[]> LastSnapshots = new();
+
+    private byte[]? ReadSnapshot(long address)
+    {
+        foreach (int size in new[] { 0x200, 0x100, 0x80 })
+        {
+            try
+            {
+                return memory.ReadBytes(new IntPtr(address), size);
+            }
+            catch
+            {
+            }
+        }
+
+        return null;
+    }
+
+    private string BuildChangeReport(IEnumerable<long> alignedHits)
+    {
+        var sb = new StringBuilder();
+
+        foreach (long hit in alignedHits.Take(8))
+        {
+            byte[]? now = ReadSnapshot(hit);
+
+            if (now == null)
+                continue;
+
+            if (LastSnapshots.TryGetValue(hit, out byte[]? before))
+            {
+                var changes = new List<string>();
+                int length = Math.Min(before.Length, now.Length);
+
+                for (int i = 0; i < length; i++)
+                {
+                    if (before[i] != now[i])
+                        changes.Add($"+{i:X3} (0x{hit + i:X8}): {before[i]:X2} -> {now[i]:X2}");
+                }
+
+                sb.AppendLine($"0x{hit:X8}: {changes.Count} byte berubah");
+
+                foreach (string change in changes.Take(40))
+                    sb.AppendLine("  " + change);
+
+                if (changes.Count > 40)
+                    sb.AppendLine("  ...");
+            }
+            else
+            {
+                sb.AppendLine(
+                    $"0x{hit:X8}: snapshot pertama disimpan " +
+                    "(ubah kondisi di game, lalu Initialize lagi)");
+            }
+
+            LastSnapshots[hit] = now;
+        }
+
+        return sb.ToString().TrimEnd();
+    }
+
+    public string WriteReport(IReadOnlyList<IntPtr> hits)
+    {
+        long[] all = hits.Select(h => h.ToInt64()).OrderBy(h => h).ToArray();
+
+        // Base pointer hanya dicari untuk hasil yang sejajar 4 byte (struktur asli selalu sejajar)
+        long[] aligned = all.Where(h => h % 4 == 0).Take(32).ToArray();
+
+        Dictionary<long, List<StaticPointer>> pointers =
+            FindStaticPointers(aligned.Select(h => h + 0x08).ToList());
+
+        var report = new StringBuilder();
+        var summary = new StringBuilder();
+
+        report.AppendLine("PURSE CHARGER - LAPORAN SCAN");
+        report.AppendLine($"Waktu       : {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        report.AppendLine($"Pola        : {Pattern}");
+        report.AppendLine($"Hasil mentah: {all.Length} (sejajar 4 byte: {all.Count(h => h % 4 == 0)})");
+        report.AppendLine();
+
+        long previous = 0;
+
+        foreach (long hit in all)
+        {
+            bool isAligned = hit % 4 == 0;
+
+            report.AppendLine($"0x{hit:X8}  {(isAligned ? "sejajar" : "TIDAK sejajar")}");
+            report.AppendLine($"  region : {DescribeRegion(hit)}");
+
+            if (previous != 0)
+                report.AppendLine($"  jarak dari hasil sebelumnya: 0x{hit - previous:X}");
+
+            previous = hit;
+
+            if (isAligned)
+            {
+                string relations = DescribeRelations(hit + 0x08);
+
+                if (relations.Length > 0)
+                    report.AppendLine("  " + relations);
+
+                if (pointers.TryGetValue(hit + 0x08, out List<StaticPointer>? found))
+                {
+                    report.AppendLine(
+                        found.Count == 0
+                            ? "  base pointer: tidak ada"
+                            : "  base pointer: " + string.Join(", ", found.Take(6).Select(DescribePointer)));
+                }
+            }
+
+            report.AppendLine("  dump (+00 .. +4F):");
+            report.AppendLine(DumpBytes(hit, 0x50));
+            report.AppendLine();
+        }
+
+        string changeReport = BuildChangeReport(aligned);
+
+        report.AppendLine("PERUBAHAN SEJAK SCAN SEBELUMNYA (snapshot 0x200 byte per hasil sejajar)");
+        report.AppendLine(changeReport);
+
+        string path = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "MuizTool",
+            "purse-charger-report.txt");
+
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, report.ToString());
+        }
+        catch
+        {
+            path = "(gagal menyimpan laporan)";
+        }
+
+        summary.AppendLine("Hasil sejajar 4 byte:");
+
+        foreach (long hit in aligned.Take(8))
+        {
+            int count = pointers.TryGetValue(hit + 0x08, out List<StaticPointer>? f) ? f.Count : 0;
+            summary.AppendLine($"  0x{hit:X8} | {DescribeRegion(hit)} | base pointer: {count}");
+        }
+
+        summary.AppendLine();
+        summary.AppendLine("Perubahan sejak scan sebelumnya:");
+
+        string[] changeLines = changeReport.Split('\n');
+
+        foreach (string line in changeLines.Take(16))
+            summary.AppendLine(line.TrimEnd('\r'));
+
+        if (changeLines.Length > 16)
+            summary.AppendLine("... (lengkap di file laporan)");
+
+        summary.AppendLine();
+        summary.AppendLine("Laporan lengkap (dump semua hasil):");
+        summary.Append(path);
+
+        return summary.ToString();
     }
 
     // =========================================================
