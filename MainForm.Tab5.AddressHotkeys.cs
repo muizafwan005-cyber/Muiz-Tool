@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Linq;
 using System.Media;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Windows.Forms;
 using RFTool.Advanced;
 using RFTool.AdvancedSystem;
@@ -107,6 +108,9 @@ public sealed partial class MainForm
         addressKeyboardProc = null;
         addressKeysDown.Clear();
         addressHeld.Clear();
+
+        lock (addressHoldLock)
+            addressHoldItems.Clear();
     }
 
     private IntPtr AddressKeyboardHookCallback(int nCode, IntPtr wParam, IntPtr lParam)
@@ -160,12 +164,18 @@ public sealed partial class MainForm
                         addressHeld.Add((entry, hotkey));
 
                     PostAddressHotkey(entry, hotkey, true);
+
+                    // Tombol ditahan -> nilai terus dipertahankan / diulang
+                    StartAddressHold(entry, hotkey);
                 }
             }
         }
         else
         {
             addressKeysDown.Remove(virtualKey);
+
+            lock (addressHoldLock)
+                addressHoldItems.RemoveAll(x => x.Key == (Keys)virtualKey);
 
             for (int i = addressHeld.Count - 1; i >= 0; i--)
             {
@@ -192,6 +202,163 @@ public sealed partial class MainForm
             {
                 if (!IsDisposed)
                     RunAddressHotkey(entry, hotkey, pressed);
+            }));
+        }
+        catch
+        {
+            // Form mungkin sedang ditutup.
+        }
+    }
+
+    // =========================================================
+    // HOLD: selama tombol hotkey ditahan, nilai dipertahankan
+    //
+    // Set value to       -> ditulis ulang terus (tiap ~4 ms) di thread terpisah,
+    //                       sehingga nilai bertahan walau game menimpanya
+    //                       (mis. speed saat karakter berjalan).
+    // Increase / Decrease -> diulang tiap 100 ms setelah jeda 300 ms.
+    // Berhenti otomatis saat tombol dilepas.
+    // =========================================================
+
+    private sealed class HoldItem
+    {
+        public AddressEntry Entry = null!;
+        public AddressHotkey Hotkey = null!;
+        public Keys Key;
+        public string Expression = "";
+        public byte[] Data = Array.Empty<byte>();
+        public long NextTick;
+    }
+
+    private readonly object addressHoldLock = new();
+    private readonly List<HoldItem> addressHoldItems = new();
+    private Thread? addressHoldThread;
+    private TargetProvider? addressHoldProvider;
+
+    private void StartAddressHold(AddressEntry entry, AddressHotkey hotkey)
+    {
+        bool isSet = hotkey.Action == AddressHotkeyAction.SetValue;
+
+        bool isDelta =
+            hotkey.Action == AddressHotkeyAction.DecreaseValue ||
+            hotkey.Action == AddressHotkeyAction.IncreaseValue;
+
+        if ((!isSet && !isDelta) || entry.IsScript)
+            return;
+
+        var item = new HoldItem
+        {
+            Entry = entry,
+            Hotkey = hotkey,
+            Key = (Keys)hotkey.Key,
+            Expression = entry.Address ?? "",
+            NextTick = Environment.TickCount64 + 300
+        };
+
+        if (isSet)
+        {
+            // Sedang di-freeze: mesin Freeze sudah menahan nilainya.
+            if (entry.Freeze)
+                return;
+
+            ScanValueType type = ValueCodec.TypeFromName(entry.ValueType);
+
+            if (!ValueCodec.TryParse(hotkey.Value, type, entry.Hex, false, out byte[] data, out _))
+                return;
+
+            item.Data = data;
+        }
+
+        addressHoldProvider = AdvSvc.Target;
+
+        lock (addressHoldLock)
+        {
+            addressHoldItems.RemoveAll(x =>
+                ReferenceEquals(x.Entry, entry) &&
+                ReferenceEquals(x.Hotkey, hotkey));
+
+            addressHoldItems.Add(item);
+
+            if (addressHoldThread == null)
+            {
+                addressHoldThread = new Thread(AddressHoldLoop)
+                {
+                    IsBackground = true,
+                    Name = "MuizHotkeyHold"
+                };
+
+                addressHoldThread.Start();
+            }
+        }
+    }
+
+    private void AddressHoldLoop()
+    {
+        while (true)
+        {
+            HoldItem[] snapshot;
+
+            lock (addressHoldLock)
+            {
+                if (addressHoldItems.Count == 0)
+                {
+                    addressHoldThread = null;
+                    return;
+                }
+
+                snapshot = addressHoldItems.ToArray();
+            }
+
+            TargetProcess? target = addressHoldProvider?.Get();
+            long now = Environment.TickCount64;
+
+            foreach (HoldItem item in snapshot)
+            {
+                // Pengaman: tombol sudah tidak ditekan (event lepas mungkin terlewat)
+                if ((GetAsyncKeyState((int)item.Key) & 0x8000) == 0)
+                {
+                    lock (addressHoldLock)
+                        addressHoldItems.Remove(item);
+
+                    continue;
+                }
+
+                if (item.Hotkey.Action == AddressHotkeyAction.SetValue)
+                {
+                    if (target != null &&
+                        AddressExpression.TryEvaluate(
+                            target,
+                            item.Expression,
+                            null,
+                            out ulong address,
+                            out _))
+                    {
+                        target.Write(address, item.Data);
+                    }
+                }
+                else if (now >= item.NextTick)
+                {
+                    item.NextTick = now + 100;
+                    PostAddressHotkeyRepeat(item.Entry, item.Hotkey);
+                }
+            }
+
+            Thread.Sleep(4);
+        }
+    }
+
+    // Increase/Decrease diulang lewat UI thread agar tetap sinkron dengan Freeze
+    private void PostAddressHotkeyRepeat(AddressEntry entry, AddressHotkey hotkey)
+    {
+        if (IsDisposed || !IsHandleCreated)
+            return;
+
+        try
+        {
+            BeginInvoke(new Action(() =>
+            {
+                if (!IsDisposed && addressManager.Entries.Contains(entry))
+                    ApplyValueHotkey(entry, hotkey, true);
             }));
         }
         catch
@@ -317,7 +484,7 @@ public sealed partial class MainForm
         return true;
     }
 
-    private void ApplyValueHotkey(AddressEntry entry, AddressHotkey hotkey)
+    private void ApplyValueHotkey(AddressEntry entry, AddressHotkey hotkey, bool repeat = false)
     {
         if (entry.IsScript)
         {
@@ -328,7 +495,7 @@ public sealed partial class MainForm
 
         if (hotkey.Action == AddressHotkeyAction.SetValue)
         {
-            if (WriteEntryValueNow(entry, hotkey.Value))
+            if (WriteEntryValueNow(entry, hotkey.Value) && !repeat)
                 PlayAddressSound(hotkey.ActivateSound);
 
             return;
@@ -392,7 +559,8 @@ public sealed partial class MainForm
             "Hotkey: " + entry.Description + (decrease ? " - " : " + ") +
             hotkey.Value + " = " + newText;
 
-        PlayAddressSound(hotkey.ActivateSound);
+        if (!repeat)
+            PlayAddressSound(hotkey.ActivateSound);
     }
 
     // Tambah / kurang nilai angka sesuai tipe (integer dibungkus sesuai ukuran tipe)
@@ -888,6 +1056,9 @@ public sealed partial class MainForm
             addressHotkeyCapturing = false;
             addressKeysDown.Clear();
             addressHeld.Clear();
+
+            lock (addressHoldLock)
+                addressHoldItems.Clear();
         }
 
         if (result != DialogResult.OK)
