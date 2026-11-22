@@ -1833,75 +1833,105 @@ public void SetPlayerPointerOffset(long baseOffset)
     // PURSE CHARGER AOB - INITIALIZE
     // =========================================================
 
+    // Info hasil Initialize (hubungan dengan base pointer Tab 1 / Tab 7, dsb).
+    public string PurseChargerInfo { get; private set; } = "";
+
+    private PurseChargerResolver? purseResolver;
+
     public IntPtr InitializePurseChargerAob()
     {
         purseChargerAddress = IntPtr.Zero;
         purseChargeOriginal = null;
+        PurseChargerInfo = "";
 
-        const string pattern =
-            "FF 55 55 55 00 00 00 00";
+        purseResolver ??= new PurseChargerResolver(
+            memory,
+            () => playerPointerOffset);
 
+        // 1) Base pointer yang sudah dipelajari: stabil, tanpa scan.
+        if (purseResolver.TryResolveLearned(
+                out IntPtr viaPointer,
+                out string pointerInfo))
+        {
+            purseChargerAddress = viaPointer;
+            PurseChargerInfo = pointerInfo;
+
+            return purseChargerAddress;
+        }
+
+        // 2) Fallback AOB.
         var hits =
-            scanner.ScanProcess(pattern);
+            scanner.ScanProcess(PurseChargerResolver.Pattern);
 
-        IntPtr foundAddress = IntPtr.Zero;
-        int validCount = 0;
+        var valid = new List<IntPtr>();
+        var rawSamples = new List<string>();
 
         foreach (var hit in hits)
         {
             long candidate = hit.ToInt64();
 
-            try
+            if (purseResolver.TryValidate(candidate, out IntPtr target))
             {
-                // Base + 0x2C harus berisi B7 84 41 00.
-                byte[] marker =
-                    memory.ReadBytes(
-                        new IntPtr(candidate + 0x2C),
-                        4);
-
-                // Base + 0x30 harus berisi 55.
-                byte marker30 =
-                    memory.ReadByte(
-                        new IntPtr(candidate + 0x30));
-
-                if (!marker.SequenceEqual(
-                    new byte[]
-                    {
-                        0xB7,
-                        0x84,
-                        0x41,
-                        0x00
-                    }))
-                {
-                    continue;
-                }
-
-                if (marker30 != 0x55)
-                    continue;
-
-                // Target Purse Charger = Base + 0x08.
-                IntPtr target =
-                    new IntPtr(candidate + 0x08);
-
-                // Pastikan target dapat dibaca.
-                memory.ReadBytes(target, 1);
-
-                foundAddress = target;
-                validCount++;
+                if (!valid.Contains(target))
+                    valid.Add(target);
             }
-            catch
+            else if (rawSamples.Count < 5)
             {
-                // Kandidat tidak valid atau tidak dapat dibaca.
+                rawSamples.Add(purseResolver.DescribeRaw(candidate));
             }
         }
 
-        if (validCount != 1)
+        if (valid.Count == 0 || valid.Count > 16)
         {
             throw new InvalidOperationException(
-                $"PURSE CHARGER AOB: kandidat valid = {validCount}");
+                purseResolver.BuildDiagnostics(
+                    hits.Count,
+                    valid,
+                    rawSamples,
+                    null));
         }
 
-        purseChargerAddress = foundAddress;
+        // Cari base pointer statis untuk semua kandidat sekaligus.
+        var pointers =
+            purseResolver.FindStaticPointers(
+                valid.Select(v => v.ToInt64()).ToList());
+
+        IntPtr chosen;
+
+        if (valid.Count == 1)
+        {
+            chosen = valid[0];
+        }
+        else
+        {
+            // Salinan lama (stale) tidak punya pointer statis.
+            var anchored =
+                valid
+                    .Where(v => pointers[v.ToInt64()].Count > 0)
+                    .ToList();
+
+            if (anchored.Count != 1)
+            {
+                throw new InvalidOperationException(
+                    purseResolver.BuildDiagnostics(
+                        hits.Count,
+                        valid,
+                        rawSamples,
+                        pointers));
+            }
+
+            chosen = anchored[0];
+        }
+
+        purseChargerAddress = chosen;
+
+        PurseChargerInfo =
+            purseResolver.LearnFrom(
+                chosen,
+                pointers[chosen.ToInt64()]) +
+            (valid.Count > 1
+                ? $" | dipilih dari {valid.Count} kandidat lewat base pointer"
+                : "");
 
         return purseChargerAddress;
     }
