@@ -40,6 +40,9 @@ internal sealed class PurseChargerResolver
 
     private const long MaxPointerDelta = 0x2000;
     private const long MaxPlayerDelta = 0x100000;
+
+    // Batas jarak dari objek Player agar sebuah alamat dianggap bagian dari struktur Player
+    private const long MaxPlayerAnchor = 0x40000;
     private const string ModuleName = "RF_Online.bin";
 
     public sealed record StaticPointer(long ModuleOffset, long Value, long Delta);
@@ -370,6 +373,29 @@ internal sealed class PurseChargerResolver
         return string.Join(" | ", parts);
     }
 
+    // Apakah alamat berada di dalam struktur Player (base pointer Tab 1)?
+    public bool TryGetPlayerDelta(long target, out long delta)
+    {
+        delta = 0;
+
+        try
+        {
+            long player = memory.ReadPointer32(
+                new IntPtr(memory.ModuleBase.ToInt64() + playerOffset())).ToInt64();
+
+            if (player == 0)
+                return false;
+
+            delta = target - player;
+
+            return delta >= 0 && delta <= MaxPlayerAnchor;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static string Signed(long value)
     {
         return value >= 0 ? $"+0x{value:X}" : $"-0x{-value:X}";
@@ -393,7 +419,15 @@ internal sealed class PurseChargerResolver
         if (relations.Length > 0)
             parts.Add(relations);
 
-        if (pointers.Count == 1)
+        if (TryGetPlayerDelta(target.ToInt64(), out long playerDelta))
+        {
+            // Berada di dalam struktur Player: pakai base pointer Tab 1 + offset.
+            SaveSettings(new StaticPointer(playerOffset(), 0, playerDelta));
+
+            parts.Add(
+                $"base pointer Tab 1 dipelajari [{ModuleName}+{playerOffset():X}]+{playerDelta:X}");
+        }
+        else if (pointers.Count == 1)
         {
             SaveSettings(pointers[0]);
             parts.Add("base pointer dipelajari " + DescribePointer(pointers[0]));
@@ -705,7 +739,7 @@ internal sealed class PurseChargerResolver
 
             sb.AppendLine();
             sb.AppendLine(
-                "Lebih dari satu kandidat punya base pointer. " +
+                "Kandidat tidak bisa dibedakan lewat struktur Player / base pointer. " +
                 "Coba lagi saat karakter sudah di dunia dan tidak sedang loading.");
         }
 
