@@ -1915,11 +1915,21 @@ public void SetPlayerPointerOffset(long baseOffset)
         }
         else
         {
-            // Salinan lama (stale) tidak punya pointer statis.
+            // Utamakan yang berada di dalam struktur Player (base pointer Tab 1);
+            // kalau tidak ada, pakai yang punya pointer statis.
+            // Salinan lama (stale) tidak punya keduanya.
             var anchored =
                 valid
-                    .Where(v => pointers[v.ToInt64()].Count > 0)
+                    .Where(v => purseResolver.TryGetPlayerDelta(v.ToInt64(), out _))
                     .ToList();
+
+            if (anchored.Count == 0)
+            {
+                anchored =
+                    valid
+                        .Where(v => pointers[v.ToInt64()].Count > 0)
+                        .ToList();
+            }
 
             if (anchored.Count != 1)
             {
