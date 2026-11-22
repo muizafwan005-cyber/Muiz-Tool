@@ -439,6 +439,14 @@ public sealed partial class MainForm
             FreezeType.Byte,
             ref y);
 
+        // Purse Charger: [RF_Online.bin + base pointer Player] + 0x4628
+        AddFreezeRow(
+            tab1Content,
+            "Purse Charger",
+            0x4628,
+            FreezeType.Byte,
+            ref y);
+
 
         tab1Content.Height =
             Math.Max(
@@ -931,7 +939,10 @@ public sealed partial class MainForm
                         "TAB Bell[01]Cora[23]Acc[4]" ||
 
                         entry.Name ==
-                        "buta")
+                        "buta" ||
+
+                        entry.Name ==
+                        "Purse Charger")
                     {
                         var result =
                             features.WritePlayerByteVerified(
