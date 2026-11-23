@@ -113,7 +113,8 @@ public void SetPlayerPointerOffset(long baseOffset)
         new byte[] { 0xB0, 0xA0, 0x00, 0x00, 0x13 }, // =
         new byte[] { 0x10, 0x50, 0x00, 0x00, 0x01 }, // F12
         new byte[] { 0x30, 0x51, 0x00, 0x00, 0x01 }, // 8
-        new byte[] { 0xF1, 0x50, 0x00, 0x00, 0x01 }  // F11
+        new byte[] { 0xF1, 0x50, 0x00, 0x00, 0x01 }, // F11
+        new byte[] { 0x38, 0x50, 0x00, 0x00, 0x01 }  // NPC Babi Emas (3850000001) - khusus ACC
     };
 
     private static readonly string[] NpcCommandNames =
@@ -124,7 +125,8 @@ public void SetPlayerPointerOffset(long baseOffset)
         "=",
         "F12",
         "8",
-        "F11"
+        "F11",
+        "Babi Emas"
     };
 
 
@@ -972,6 +974,15 @@ public void SetPlayerPointerOffset(long baseOffset)
             npcAcc == IntPtr.Zero)
         {
             FindNpc();
+        }
+
+        // Perintah ke-8 (NPC Babi Emas) hanya ada untuk target ACC.
+        if (target != NpcTarget.Acc &&
+            (commandIndex >= NpcBelsCommands.Length ||
+             commandIndex >= NpcCoraCommands.Length))
+        {
+            throw new InvalidOperationException(
+                "Perintah ini hanya tersedia untuk target ACC.");
         }
 
         switch (target)
