@@ -27,6 +27,7 @@ public sealed partial class MainForm
     private HotkeyTextBox npcF12HotkeyBox = null!;
     private HotkeyTextBox npc8HotkeyBox = null!;
     private HotkeyTextBox npcF11HotkeyBox = null!;
+    private HotkeyTextBox npcBabiEmasHotkeyBox = null!;
 
     private readonly Dictionary<HotkeyAction, HotkeyDefinition> hotkeys = new();
 
@@ -37,6 +38,7 @@ public sealed partial class MainForm
     private const int HotkeyIdNpcF12 = 1005;
     private const int HotkeyIdNpc8 = 1006;
     private const int HotkeyIdNpcF11 = 1007;
+    private const int HotkeyIdNpcBabiEmas = 1008;
 
     private const int WH_KEYBOARD_LL = 13;
     private const int WM_KEYDOWN = 0x0100;
@@ -68,7 +70,8 @@ public sealed partial class MainForm
         NpcEquals,
         NpcF12,
         Npc8,
-        NpcF11
+        NpcF11,
+        NpcBabiEmas
     }
 
     private sealed class HotkeyDefinition
@@ -115,6 +118,7 @@ public sealed partial class MainForm
         public SavedHotkey? NpcF12 { get; set; }
         public SavedHotkey? Npc8 { get; set; }
         public SavedHotkey? NpcF11 { get; set; }
+        public SavedHotkey? NpcBabiEmas { get; set; }
     }
 
     private sealed class SavedHotkey
@@ -344,6 +348,7 @@ public sealed partial class MainForm
                 HotkeyAction.NpcF12 => 4,
                 HotkeyAction.Npc8 => 5,
                 HotkeyAction.NpcF11 => 6,
+                HotkeyAction.NpcBabiEmas => 7,
                 _ => -1
             };
 
@@ -351,6 +356,15 @@ public sealed partial class MainForm
                 return;
 
             NpcTarget target = GetSelectedNpcTarget();
+
+            // NPC Babi Emas hanya tersedia untuk target ACC.
+            if (action == HotkeyAction.NpcBabiEmas &&
+                target != NpcTarget.Acc)
+            {
+                statusLabel.Text =
+                    "Status: NPC Babi Emas hanya untuk target ACC. Pilih ACC dulu.";
+                return;
+            }
 
             features.ExecuteNpcCommand(commandIndex, target);
 
@@ -384,6 +398,7 @@ public sealed partial class MainForm
             HotkeyAction.NpcF12 => "NPC Potion",
             HotkeyAction.Npc8 => "NPC Vendor",
             HotkeyAction.NpcF11 => "NPC Hero",
+            HotkeyAction.NpcBabiEmas => "NPC Babi Emas",
             _ => "Unknown"
         };
     }
@@ -399,6 +414,7 @@ public sealed partial class MainForm
             HotkeyAction.NpcF12 => "F12",
             HotkeyAction.Npc8 => "8",
             HotkeyAction.NpcF11 => "F11",
+            HotkeyAction.NpcBabiEmas => "Babi Emas",
             _ => action.ToString()
         };
     }
@@ -467,7 +483,12 @@ public sealed partial class MainForm
 
         npcF11HotkeyBox = AddHotkeyRow(
             panel, "NPC Hero", HotkeyAction.NpcF11, y);
-        y += 82;
+        y += 72;
+
+        npcBabiEmasHotkeyBox = AddHotkeyRow(
+            panel, "NPC Babi Emas (ACC)", HotkeyAction.NpcBabiEmas, y);
+        // Jarak ekstra agar RESET HOTKEY / SIMPAN berada di bawah slot terakhir
+        y += 100;
 
         var resetButton = new Button
         {
@@ -848,6 +869,10 @@ public sealed partial class MainForm
         npcF11HotkeyBox.Text = FormatHotkey(
             hotkeys[HotkeyAction.NpcF11].Modifiers,
             hotkeys[HotkeyAction.NpcF11].Key);
+
+        npcBabiEmasHotkeyBox.Text = FormatHotkey(
+            hotkeys[HotkeyAction.NpcBabiEmas].Modifiers,
+            hotkeys[HotkeyAction.NpcBabiEmas].Key);
     }
 
     // 9. LOAD / SAVE / RESET
@@ -875,6 +900,9 @@ public sealed partial class MainForm
         hotkeys[HotkeyAction.NpcF11] = new HotkeyDefinition(
             HotkeyIdNpcF11, HotkeyAction.NpcF11, Keys.F7, Keys.Control);
 
+        hotkeys[HotkeyAction.NpcBabiEmas] = new HotkeyDefinition(
+            HotkeyIdNpcBabiEmas, HotkeyAction.NpcBabiEmas, Keys.F8, Keys.Control);
+
         try
         {
             if (!File.Exists(hotkeyFile))
@@ -901,6 +929,7 @@ public sealed partial class MainForm
             ApplySavedHotkey(HotkeyAction.NpcF12, data.NpcF12);
             ApplySavedHotkey(HotkeyAction.Npc8, data.Npc8);
             ApplySavedHotkey(HotkeyAction.NpcF11, data.NpcF11);
+            ApplySavedHotkey(HotkeyAction.NpcBabiEmas, data.NpcBabiEmas);
         }
         catch
         {
@@ -943,7 +972,8 @@ public sealed partial class MainForm
                 NpcEquals = CreateSavedHotkey(HotkeyAction.NpcEquals),
                 NpcF12 = CreateSavedHotkey(HotkeyAction.NpcF12),
                 Npc8 = CreateSavedHotkey(HotkeyAction.Npc8),
-                NpcF11 = CreateSavedHotkey(HotkeyAction.NpcF11)
+                NpcF11 = CreateSavedHotkey(HotkeyAction.NpcF11),
+                NpcBabiEmas = CreateSavedHotkey(HotkeyAction.NpcBabiEmas)
             };
 
             var options = new JsonSerializerOptions
@@ -1000,6 +1030,9 @@ public sealed partial class MainForm
 
         hotkeys[HotkeyAction.NpcF11] = new HotkeyDefinition(
             HotkeyIdNpcF11, HotkeyAction.NpcF11, Keys.F7, Keys.Control);
+
+        hotkeys[HotkeyAction.NpcBabiEmas] = new HotkeyDefinition(
+            HotkeyIdNpcBabiEmas, HotkeyAction.NpcBabiEmas, Keys.F8, Keys.Control);
 
         UpdateHotkeyBoxes();
         RegisterAllHotkeys();
