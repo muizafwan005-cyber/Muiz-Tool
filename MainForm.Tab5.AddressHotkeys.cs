@@ -150,6 +150,10 @@ public sealed partial class MainForm
             if (!addressKeysDown.Add(virtualKey))
                 return;
 
+            // Multi karakter: hanya window yang game-nya aktif yang menjalankan hotkey.
+            if (!HotkeyAllowedHere())
+                return;
+
             Keys key = (Keys)virtualKey;
             Keys modifiers = GetCurrentModifiers();
 
