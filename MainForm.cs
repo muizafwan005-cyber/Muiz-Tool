@@ -150,7 +150,7 @@ public sealed partial class MainForm : Form
                 DockStyle.Top,
 
             Height =
-                124,
+                152,
 
             BackColor =
                 BackColorPanel
@@ -288,6 +288,8 @@ public sealed partial class MainForm : Form
         };
         
         topPanel.Controls.Add(statusLabel);
+
+        BuildCharacterBar(topPanel);
 
         var basePointerLabel = new Label
         {
@@ -642,7 +644,8 @@ public sealed partial class MainForm : Form
                 is ProcessItem item &&
                 item.Name.Equals(
                     "RF_Online",
-                    StringComparison.OrdinalIgnoreCase))
+                    StringComparison.OrdinalIgnoreCase) &&
+                !IsProcessUsedByOtherWindow(item.Id))
             {
                 rfIndex = i;
                 break;
@@ -674,6 +677,18 @@ public sealed partial class MainForm : Form
             MessageBox.Show(
                 this,
                 "Pilih process terlebih dahulu.",
+                "RF Tool",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+
+            return;
+        }
+
+        if (IsProcessUsedByOtherWindow(item.Id))
+        {
+            MessageBox.Show(
+                this,
+                "Process ini sudah dipakai di window karakter lain.",
                 "RF Tool",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Warning);
