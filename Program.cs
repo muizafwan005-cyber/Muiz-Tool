@@ -9,6 +9,10 @@ internal static class Program
     static void Main()
     {
         ApplicationConfiguration.Initialize();
-        Application.Run(new MainForm());
+
+        // Beberapa window karakter (tombol "+") berjalan di 1 aplikasi.
+        // Aplikasi selesai setelah window terakhir ditutup.
+        new MainForm().Show();
+        Application.Run();
     }
 }
